@@ -1,6 +1,4 @@
-#![allow(dead_code)]
-
-use std::{path::Path, io, fs, mem::size_of};
+use std::{fs, io, mem::size_of, path::Path};
 
 pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 pub const IHDR: ChunkType = ChunkType([73, 72, 68, 82]);
@@ -11,6 +9,20 @@ pub const IEND: ChunkType = ChunkType([73, 69, 78, 68]);
 pub struct ChunkType([u8; 4]);
 
 impl ChunkType {
+    pub fn from_code(code: &str) -> Self {
+        assert_eq!(code.len(), 4);
+        assert!(code.is_ascii());
+
+        let mut chars = code.chars();
+
+        ChunkType([
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+        ])
+    }
+
     pub fn from_slice(data: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
         let bytes = data.try_into()?;
         Ok(Self(bytes))
@@ -21,8 +33,6 @@ impl ChunkType {
     }
 }
 
-
-
 #[derive(Default, Debug, Clone)]
 pub struct Chunk {
     pub chunk_type: ChunkType,
@@ -31,33 +41,32 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn new(size: usize, data: &[u8]) -> Self {
+    pub fn new(chunk_type: ChunkType, data: &[u8]) -> Self {
+        Self {
+            chunk_type,
+            data: data.to_owned(),
+            crc: 0,
+        }
+    }
+
+    pub fn from_bytes(size: usize, data: &[u8]) -> Self {
         assert_eq!(size + 8, data.len());
 
         Self {
             chunk_type: ChunkType::from_slice(&data[..4]).unwrap(),
-            data: data[4 .. 4+size].to_owned(),
-            crc: u32::from_be_bytes(data[size+4 ..].try_into().unwrap()),
+            data: data[4..4 + size].to_owned(),
+            crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.len() + size_of::<ChunkType>() + 2 * size_of::<u32>()
     }
 
     pub fn check_crc(&self) -> bool {
         todo!()
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(8 + self.data.len());
-        bytes.extend_from_slice(&self.chunk_type.0);
-        bytes.extend_from_slice(&self.data);
-        bytes.extend_from_slice(&self.crc.to_be_bytes());
-        bytes
-    }
-
-    pub fn size(&self) -> usize {
-        self.data.len() + size_of::<ChunkType>() + size_of::<u32>()
-    }
 }
-
 
 #[derive(Default, Debug, Clone)]
 pub struct Png {
@@ -74,7 +83,7 @@ impl Png {
         //
         // A PNG consists in a signature (that every PNG should have) and a series of chunks, that may
         // be of different types.
-        if file_data[p .. p+8] != SIGN {
+        if file_data[p..p + 8] != SIGN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "The given file is not a PNG file",
@@ -94,11 +103,12 @@ impl Png {
         // Note that the bytes are stored in Big-Endian
         let mut should_end = false;
         while !should_end {
-            let chunk_size = u32::from_be_bytes(file_data[p .. p+4].try_into().unwrap()) as usize;
-            let chunk = Chunk::new(chunk_size, &file_data[p+4 .. (p+4)+4+chunk_size+4]);
+            let chunk_size = u32::from_be_bytes(file_data[p..p + 4].try_into().unwrap()) as usize;
+            let chunk =
+                Chunk::from_bytes(chunk_size, &file_data[p + 4..(p + 4) + 4 + chunk_size + 4]);
             p += chunk_size + 12;
 
-            if chunk.chunk_type == IEND {
+            if p >= file_data.len() {
                 should_end = true;
             }
 
@@ -109,9 +119,13 @@ impl Png {
     }
 
     pub fn write(&self, output_file: &Path) -> io::Result<()> {
-        let mut bytes = Vec::with_capacity(self.chunks.iter().map(|c| c.size()).sum());
+        let mut bytes = Vec::with_capacity(
+            size_of::<[u8; 8]>() + self.chunks.iter().map(|c| c.size()).sum::<usize>(),
+        );
+        bytes.extend_from_slice(&SIGN);
 
         for chunk in &self.chunks {
+            bytes.extend_from_slice(&(chunk.data.len() as u32).to_be_bytes());
             bytes.extend_from_slice(&chunk.chunk_type.0);
             bytes.extend_from_slice(&chunk.data);
             bytes.extend_from_slice(&chunk.crc.to_be_bytes());

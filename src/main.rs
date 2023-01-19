@@ -1,13 +1,13 @@
 use std::{env, path::Path, process};
 
 mod png;
-use png::Png;
+use png::{Chunk, ChunkType, Png};
 
 fn main() {
     let mut args = env::args();
     let program_name = args.next().expect("Program name not found");
 
-    let png = match args.next() {
+    let mut png = match args.next() {
         None => {
             println!("USAGE: {} <filepath.png>", program_name);
             process::exit(1);
@@ -22,7 +22,12 @@ fn main() {
         },
     };
 
-    for (i,chunk) in png.chunks.into_iter().enumerate() {
-        println!("{} {}", i, chunk.chunk_type.get_code().unwrap());
-    }
+    png.chunks.insert(
+        1,
+        Chunk::new(
+            ChunkType::from_code("test"),
+            "*secret code here*".as_bytes(),
+        ),
+    );
+    png.write(Path::new("./output.png")).unwrap();
 }
