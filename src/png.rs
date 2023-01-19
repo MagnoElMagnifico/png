@@ -1,73 +1,17 @@
 use std::{fs, io, mem::size_of, path::Path};
 
+// Signature and common ChunkCodes
+// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Chunks.html
 pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
-pub const IHDR: ChunkType = ChunkType([73, 72, 68, 82]);
-pub const IDAT: ChunkType = ChunkType([73, 68, 65, 84]);
-pub const IEND: ChunkType = ChunkType([73, 69, 78, 68]);
+pub const IHDR: ChunkCode = ChunkCode([73, 72, 68, 82]);
+pub const IDAT: ChunkCode = ChunkCode([73, 68, 65, 84]);
+pub const IEND: ChunkCode = ChunkCode([73, 69, 78, 68]);
 
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
-pub struct ChunkType([u8; 4]);
 
-impl ChunkType {
-    pub fn from_code(code: &str) -> Self {
-        assert_eq!(code.len(), 4);
-        assert!(code.is_ascii());
-
-        let mut chars = code.chars();
-
-        ChunkType([
-            chars.next().unwrap() as u8,
-            chars.next().unwrap() as u8,
-            chars.next().unwrap() as u8,
-            chars.next().unwrap() as u8,
-        ])
-    }
-
-    pub fn from_slice(data: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
-        let bytes = data.try_into()?;
-        Ok(Self(bytes))
-    }
-
-    pub fn get_code<'a>(&'a self) -> Result<&'a str, std::str::Utf8Error> {
-        std::str::from_utf8(&self.0)
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct Chunk {
-    pub chunk_type: ChunkType,
-    pub data: Vec<u8>,
-    pub crc: u32,
-}
-
-impl Chunk {
-    pub fn new(chunk_type: ChunkType, data: &[u8]) -> Self {
-        Self {
-            chunk_type,
-            data: data.to_owned(),
-            crc: 0,
-        }
-    }
-
-    pub fn from_bytes(size: usize, data: &[u8]) -> Self {
-        assert_eq!(size + 8, data.len());
-
-        Self {
-            chunk_type: ChunkType::from_slice(&data[..4]).unwrap(),
-            data: data[4..4 + size].to_owned(),
-            crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        self.data.len() + size_of::<ChunkType>() + 2 * size_of::<u32>()
-    }
-
-    pub fn check_crc(&self) -> bool {
-        todo!()
-    }
-}
-
+// Following the official spec: http://libpng.org/pub/png/spec/1.2/PNG-Structure.html
+//
+// A PNG consists in a signature (that every PNG should have) and a series of chunks, that may
+// be of different types. The order of these last ones do not matter.
 #[derive(Default, Debug, Clone)]
 pub struct Png {
     pub chunks: Vec<Chunk>,
@@ -79,10 +23,6 @@ impl Png {
 
         let mut p = 0_usize;
 
-        // Following the official spec: http://libpng.org/pub/png/spec/1.2/PNG-Structure.html
-        //
-        // A PNG consists in a signature (that every PNG should have) and a series of chunks, that may
-        // be of different types.
         if file_data[p..p + 8] != SIGN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -95,12 +35,6 @@ impl Png {
             chunks: Vec::with_capacity(3),
         };
 
-        // Each chunk has the following structure:
-        //  - length of the data section: u32
-        //  - chunk type code: u32
-        //  - chunk data section
-        //  - cyclic redundency check
-        // Note that the bytes are stored in Big-Endian
         let mut should_end = false;
         while !should_end {
             let chunk_size = u32::from_be_bytes(file_data[p..p + 4].try_into().unwrap()) as usize;
@@ -132,5 +66,84 @@ impl Png {
         }
 
         fs::write(output_file, bytes)
+    }
+}
+
+
+// Each chunk has the following structure:
+//  - length of the data section: u32
+//  - chunk type code: u32
+//  - chunk data section
+//  - cyclic redundency check
+// Note that the bytes are stored in Big-Endian
+#[derive(Default, Debug, Clone)]
+pub struct Chunk {
+    pub chunk_type: ChunkCode,
+    pub data: Vec<u8>,
+    pub crc: u32,
+}
+
+impl Chunk {
+    pub fn new(chunk_type: ChunkCode, data: &[u8]) -> Self {
+        Self {
+            chunk_type,
+            data: data.to_owned(),
+            crc: 0,
+        }
+    }
+
+    pub fn from_bytes(size: usize, data: &[u8]) -> Self {
+        assert_eq!(size + 8, data.len());
+
+        Self {
+            chunk_type: ChunkCode::from_slice(&data[..4]).unwrap(),
+            data: data[4..4 + size].to_owned(),
+            crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.len() + size_of::<ChunkCode>() + 2 * size_of::<u32>()
+    }
+
+    // The CRC or Cyclic Redundency Check
+    pub fn calculate_crc(&self) -> u32 {
+        todo!()
+    }
+}
+
+
+// The ChunkCode consists in four bytes whose values are between 65-90 and 97-122 decimal, so
+// uppercase and lowercase ASCII letters. However they should be always treated as integers and not
+// chars.
+// The 5th bit of a ASCII char determines if it is uppercase or lowercase.
+//    - 1st byte: 0 (uppercase) = critical, 1 (lowercase) = optional
+//    - 2nd byte: 0 (uppercase) = public special-purpose code, 1 (lowercase) = private unregistered code
+//    - 3rd byte: 0 (uppercase) = using current version of PNG
+//    - 4th byte: 0 (uppercase) = not safe to copy, 1 (lowercase) = save to copy (related to PNG
+//    editors and they should handle unrecognized chunks: if it is unsafe to copy, it means the
+//    chunk is dependent on the image data, and if the image was modified, it it no longer valid)
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct ChunkCode([u8; 4]);
+
+impl ChunkCode {
+    pub fn from_code(code: &str) -> Self {
+        let mut chars = code.chars();
+
+        ChunkCode([
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+            chars.next().unwrap() as u8,
+        ])
+    }
+
+    pub fn from_slice(data: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
+        let bytes = data.try_into()?;
+        Ok(Self(bytes))
+    }
+
+    pub fn get_code<'a>(&'a self) -> Result<&'a str, std::str::Utf8Error> {
+        std::str::from_utf8(&self.0)
     }
 }

@@ -1,7 +1,7 @@
 use std::{env, path::Path, process};
 
 mod png;
-use png::{Chunk, ChunkType, Png};
+use png::{Chunk, ChunkCode, Png};
 
 fn main() {
     let mut args = env::args();
@@ -25,7 +25,7 @@ fn main() {
     png.chunks.insert(
         1,
         Chunk::new(
-            ChunkType::from_code("test"),
+            ChunkCode::from_code("testing"),
             "*secret code here*".as_bytes(),
         ),
     );
