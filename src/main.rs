@@ -25,7 +25,7 @@ fn main() {
     png.chunks.insert(
         1,
         Chunk::new(
-            ChunkCode::from_code("testing"),
+            ChunkCode::from_code("teSt"),
             "*secret code here*".as_bytes(),
         ),
     );
