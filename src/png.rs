@@ -83,6 +83,102 @@ impl Png {
     }
 }
 
+/// Each chunk has the following structure:
+///
+/// - length of the data section: u32
+/// - chunk type code: u32
+/// - chunk data section
+/// - cyclic redundency check
+///
+/// Note that the bytes (u32) are stored in Big-Endian
+#[derive(Default, Debug, Clone)]
+pub struct Chunk {
+    pub chunk_type: ChunkCode,
+    pub data: Vec<u8>,
+    pub crc: u32,
+}
+
+impl Chunk {
+    pub fn new(chunk_type: ChunkCode, data: &[u8]) -> Self {
+        Self {
+            chunk_type,
+            data: data.to_owned(),
+            crc: 0,
+        }
+    }
+
+    pub fn from_bytes(size: usize, data: &[u8]) -> Self {
+        assert_eq!(
+            size + 8,
+            data.len(),
+            "The data length should be {}, got {}",
+            size + 8,
+            data.len()
+        );
+
+        Self {
+            chunk_type: ChunkCode::from_slice(&data[..4]).unwrap(),
+            data: data[4..4 + size].to_owned(),
+            crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.len() + size_of::<ChunkCode>() + 2 * size_of::<u32>()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.size());
+        bytes.extend_from_slice(&(self.data.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(&self.chunk_type.0);
+        bytes.extend_from_slice(&self.data);
+        bytes
+    }
+}
+
+/// The ChunkCode consists in four bytes whose values are between 65-90 and 97-122 decimal, so
+/// uppercase and lowercase ASCII letters. However they should be always treated as integers and not
+/// chars.
+///
+/// The 5th bit of a ASCII char determines if it is uppercase (0) or lowercase (1).
+///
+/// - 1st byte: 0: critical, 1: optional
+/// - 2nd byte: 0: public special-purpose code, 1: private unregistered code
+/// - 3rd byte: 0: using current version of PNG
+/// - 4th byte: 0: not safe to copy, 1: save to copy (related to PNG
+/// editors and they should handle unrecognized chunks: if it is unsafe to copy, it means the
+/// chunk is dependent on the image data, and if the image was modified, it it no longer valid)
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct ChunkCode([u8; 4]);
+
+impl ChunkCode {
+    pub fn from_code(code: &str) -> Self {
+        assert_eq!(
+            4,
+            code.len(),
+            "The code length should be 4, got {}",
+            code.len()
+        );
+
+        let mut chunk_code = [0; 4];
+
+        for (i, char) in code.chars().enumerate() {
+            chunk_code[i] = char as u8;
+        }
+
+        ChunkCode(chunk_code)
+    }
+
+    pub fn from_slice(data: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
+        let bytes = data.try_into()?;
+        Ok(Self(bytes))
+    }
+
+    pub fn get_code(&self) -> Result<&str, std::str::Utf8Error> {
+        std::str::from_utf8(&self.0)
+    }
+}
+
 const CRC_MASK: u32 = 0xEDB88320;
 const CRC_TABLE_SZ: usize = u8::MAX as usize + 1;
 
@@ -198,101 +294,5 @@ impl Crc {
 
         // Invert the bits (1's complement)
         crc ^ 0xFFFF_FFFF_u32
-    }
-}
-
-/// Each chunk has the following structure:
-///
-/// - length of the data section: u32
-/// - chunk type code: u32
-/// - chunk data section
-/// - cyclic redundency check
-///
-/// Note that the bytes (u32) are stored in Big-Endian
-#[derive(Default, Debug, Clone)]
-pub struct Chunk {
-    pub chunk_type: ChunkCode,
-    pub data: Vec<u8>,
-    pub crc: u32,
-}
-
-impl Chunk {
-    pub fn new(chunk_type: ChunkCode, data: &[u8]) -> Self {
-        Self {
-            chunk_type,
-            data: data.to_owned(),
-            crc: 0,
-        }
-    }
-
-    pub fn from_bytes(size: usize, data: &[u8]) -> Self {
-        assert_eq!(
-            size + 8,
-            data.len(),
-            "The data length should be {}, got {}",
-            size + 8,
-            data.len()
-        );
-
-        Self {
-            chunk_type: ChunkCode::from_slice(&data[..4]).unwrap(),
-            data: data[4..4 + size].to_owned(),
-            crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        self.data.len() + size_of::<ChunkCode>() + 2 * size_of::<u32>()
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(self.size());
-        bytes.extend_from_slice(&(self.data.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(&self.chunk_type.0);
-        bytes.extend_from_slice(&self.data);
-        bytes
-    }
-}
-
-/// The ChunkCode consists in four bytes whose values are between 65-90 and 97-122 decimal, so
-/// uppercase and lowercase ASCII letters. However they should be always treated as integers and not
-/// chars.
-///
-/// The 5th bit of a ASCII char determines if it is uppercase (0) or lowercase (1).
-///
-/// - 1st byte: 0: critical, 1: optional
-/// - 2nd byte: 0: public special-purpose code, 1: private unregistered code
-/// - 3rd byte: 0: using current version of PNG
-/// - 4th byte: 0: not safe to copy, 1: save to copy (related to PNG
-/// editors and they should handle unrecognized chunks: if it is unsafe to copy, it means the
-/// chunk is dependent on the image data, and if the image was modified, it it no longer valid)
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
-pub struct ChunkCode([u8; 4]);
-
-impl ChunkCode {
-    pub fn from_code(code: &str) -> Self {
-        assert_eq!(
-            4,
-            code.len(),
-            "The code length should be 4, got {}",
-            code.len()
-        );
-
-        let mut chunk_code = [0; 4];
-
-        for (i, char) in code.chars().enumerate() {
-            chunk_code[i] = char as u8;
-        }
-
-        ChunkCode(chunk_code)
-    }
-
-    pub fn from_slice(data: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
-        let bytes = data.try_into()?;
-        Ok(Self(bytes))
-    }
-
-    pub fn get_code(&self) -> Result<&str, std::str::Utf8Error> {
-        std::str::from_utf8(&self.0)
     }
 }
