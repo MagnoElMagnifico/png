@@ -116,17 +116,17 @@ impl Crc {
     pub fn new() -> Self {
         let mut table = [0; CRC_TABLE_SZ];
 
-        for i in 0..CRC_TABLE_SZ {
+        for (i, element) in table.iter_mut().enumerate() {
             let mut c = i as u32;
             for _ in 0..8 {
                 if (c & 1) == 1 {
                     c = CRC_MASK ^ (c >> 1);
                 } else {
-                    c = c >> 1;
+                    c >>= 1;
                 }
             }
 
-            table[i] = c;
+            *element = c;
         }
 
         Crc(table)
@@ -136,7 +136,7 @@ impl Crc {
         let mut c = crc;
 
         for n in buffer {
-            c = self.0[((c as u8 ^ n) & 0xff_u8) as usize] ^ (c >> 8);
+            c = self.0[(c as u8 ^ n) as usize] ^ (c >> 8);
         }
 
         c
@@ -228,7 +228,7 @@ impl ChunkCode {
         Ok(Self(bytes))
     }
 
-    pub fn get_code<'a>(&'a self) -> Result<&'a str, std::str::Utf8Error> {
+    pub fn get_code(&self) -> Result<&str, std::str::Utf8Error> {
         std::str::from_utf8(&self.0)
     }
 }
