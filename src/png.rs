@@ -51,7 +51,7 @@ impl Png {
             let read_crc = u32::from_be_bytes(file_data[p..p + 4].try_into().unwrap());
             p += 4;
 
-            if calculated_crc == read_crc {
+            if calculated_crc != read_crc {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!(

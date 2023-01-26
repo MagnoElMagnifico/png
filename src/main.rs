@@ -26,6 +26,7 @@ fn main() {
         },
     };
 
+    println!("{:#?}", png.chunks);
     png.chunks.insert(
         1,
         Box::new(GenericChunk::new(

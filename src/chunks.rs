@@ -75,7 +75,7 @@ impl ChunkType {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait Chunk {
+pub trait Chunk: std::fmt::Debug {
     /// Returns the size of the data section (not including type)
     fn data_size(&self) -> u32;
     fn get_type(&self) -> ChunkType;
@@ -131,14 +131,24 @@ impl Chunk for GenericChunk {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+/// IHDR Chunk must appear first:
+///
+///  - Width (px):         4 bytes
+///  - Height (px):        4 bytes
+///  - Bit depth:          1 byte
+///  - Color type:         1 byte
+///  - Compression method: 1 byte
+///  - Filter method:      1 byte
+///  - Interlace method:   1 byte
 #[derive(Debug, Copy, Clone, Default)]
 pub struct ImageHeader {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    compression: u8,
-    filter: u8,
-    interlace: u8,
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u8,
+    pub color_type: u8,
+    pub compression: u8,
+    pub filter: u8,
+    pub interlace: u8,
 }
 
 impl ImageHeader {
@@ -147,9 +157,10 @@ impl ImageHeader {
             width: u32::from_be_bytes(data[0..4].try_into().unwrap()),
             height: u32::from_be_bytes(data[4..8].try_into().unwrap()),
             bit_depth: data[8],
-            compression: data[9],
-            filter: data[10],
-            interlace: data[11],
+            color_type: data[9],
+            compression: data[10],
+            filter: data[11],
+            interlace: data[12],
         }
     }
 }
@@ -164,8 +175,34 @@ impl Chunk for ImageHeader {
     }
 
     fn data_to_bytes(&self) -> Vec<u8> {
-        todo!()
+        let mut bytes = Vec::with_capacity(self.data_size() as usize);
+        bytes.extend_from_slice(&self.width.to_be_bytes());
+        bytes.extend_from_slice(&self.height.to_be_bytes());
+        bytes.push(self.bit_depth);
+        bytes.push(self.compression);
+        bytes.push(self.filter);
+        bytes.push(self.interlace);
+        bytes
     }
+}
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+struct ImageTrailer;
+
+impl Chunk for ImageTrailer {
+    fn data_size(&self) -> u32 {
+        0
+    }
+
+    fn get_type(&self) -> ChunkType {
+        IEND
+    }
+
+    fn data_to_bytes(&self) -> Vec<u8> {
+        vec![ 0 ]
+    }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -175,6 +212,7 @@ impl Chunk for ImageHeader {
 pub fn from_bytes(bytes: &[u8]) -> Box<dyn Chunk> {
     match ChunkType::from_slice(&bytes[..4]) {
         Ok(IHDR) => Box::new(ImageHeader::new(&bytes[4..])),
+        Ok(IEND) => Box::new(ImageTrailer {}),
         Ok(other) => Box::new(GenericChunk::new(other, &bytes[4..])),
         Err(error) => unreachable!("{}", error),
     }
