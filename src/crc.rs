@@ -72,9 +72,6 @@
 //! each byte of the message.
 //!
 //! Source (modified): https://en.wikipedia.org/wiki/Cyclic_redundancy_check
-//!
-//! Translated from the C code avaliable here:
-//! http://libpng.org/pub/png/spec/1.2/PNG-CRCAppendix.html
 
 const CRC_MASK: u32 = 0xEDB88320;
 const CRC_TABLE_SZ: usize = u8::MAX as usize + 1;

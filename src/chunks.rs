@@ -133,13 +133,45 @@ impl Chunk for GenericChunk {
 
 /// IHDR Chunk must appear first:
 ///
-///  - Width (px):         4 bytes
-///  - Height (px):        4 bytes
-///  - Bit depth:          1 byte
-///  - Color type:         1 byte
-///  - Compression method: 1 byte
-///  - Filter method:      1 byte
-///  - Interlace method:   1 byte
+///  - Width (4 bytes) and Height (4 bytes) store the size of the image in pixels. Valid range is
+///    0..=2^31.
+///
+///  - Bit Depth (1 byte) : is the number of bits per sample or per palette index (not per pixel). Valid values
+///    are 1, 2, 4, 8, and 16, although not all values are allowed for all color types.
+///
+///  - Color type (1 byte): represent sums of the following values: 1 (palette used), 2 (color
+///    used), and 4 (alpha channel used). Valid values are 0, 2, 3, 4, and 6.
+///
+///  - Compression method (1 byte): indicates the method used to compress the image data. At
+///    present, only compression method 0 (deflate/inflate compression with a sliding window of at
+///    most 32768 bytes) is defined. All standard PNG images must be compressed with this scheme.
+///
+///  - Filter method (1 byte): indicates the preprocessing method applied to the image data before
+///    compression. At present, only filter method 0 (adaptive filtering with five basic filter
+///    types) is defined.
+///
+///  - Interlace method (1 byte): indicates the transmission order of the image data. Two values
+///    are currently defined: 0 (no interlace) or 1 (Adam7 interlace).
+///
+/// Bit depth restrictions for each color type are imposed to simplify implementations and to
+/// prohibit combinations that do not compress well:
+///
+/// ```
+/// Color    Allowed     Interpretation
+/// Type     Bit Depths
+///  0       1,2,4,8,16  Each pixel is a grayscale sample.
+///  2       8,16        Each pixel is an R,G,B triple.
+///  3       1,2,4,8     Each pixel is a palette index;
+///                      a PLTE chunk must appear.
+///  4       8,16        Each pixel is a grayscale sample,
+///                      followed by an alpha sample.
+///  6       8,16        Each pixel is an R,G,B triple,
+///                      followed by an alpha sample.
+/// ```
+///
+/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Compression.html
+/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Filters.html
+/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-DataRep.html#DR.Interlaced-data-order
 #[derive(Debug, Copy, Clone, Default)]
 pub struct ImageHeader {
     pub width: u32,
@@ -187,6 +219,7 @@ impl Chunk for ImageHeader {
 }
 ////////////////////////////////////////////////////////////////////////////////
 
+/// IEND describes the end of the PNG. It must be empty.
 #[derive(Debug, Copy, Clone)]
 struct ImageTrailer;
 
@@ -217,3 +250,5 @@ pub fn from_bytes(bytes: &[u8]) -> Box<dyn Chunk> {
         Err(error) => unreachable!("{}", error),
     }
 }
+
+// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Chunks.html

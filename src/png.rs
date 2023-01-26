@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{chunks, chunks::Chunk, crc::Crc};
 use std::{fs, io, mem::size_of, path::Path};
 
