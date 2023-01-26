@@ -73,7 +73,7 @@ impl ChunkType {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait Chunk: std::fmt::Debug {
+pub trait Chunk {
     /// Returns the size of the data section (not including type)
     fn data_size(&self) -> u32;
     fn get_type(&self) -> ChunkType;
@@ -83,7 +83,7 @@ pub trait Chunk: std::fmt::Debug {
         let data_size = self.data_size();
 
         use std::mem::size_of;
-        let bytes =
+        let mut bytes =
             Vec::with_capacity(size_of::<ChunkType>() + data_size as usize + 2 * size_of::<u32>());
         bytes.extend_from_slice(&data_size.to_be_bytes());
         bytes.extend_from_slice(&self.get_type().0);
@@ -124,7 +124,7 @@ impl Chunk for GenericChunk {
     }
 
     fn data_to_bytes(&self) -> Vec<u8> {
-        self.data
+        self.data.clone()
     }
 }
 
@@ -158,7 +158,7 @@ impl ImageHeader {
 
 /// This function returns the most apropiated Chunk for the data read.
 /// The first 4 bytes are considered as the type and the rest are data.
-pub fn from_bytes(bytes: &[u8]) -> Box<dyn Chunk> {
+pub fn from_bytes(_bytes: &[u8]) -> Box<dyn Chunk> {
     unimplemented!();
 }
 

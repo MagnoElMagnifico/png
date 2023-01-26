@@ -11,7 +11,6 @@ pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 /// of different types. The order of these last ones do not matter.
 ///
 /// The official spec: http://libpng.org/pub/png/spec/1.2/PNG-Structure.html
-#[derive(Debug, Clone)]
 pub struct Png {
     pub chunks: Vec<Box<dyn Chunk>>,
     crc: Crc,
