@@ -9,6 +9,8 @@
 //!
 //! Note that the bytes (u32) are stored in Big-Endian
 
+use std::mem::size_of;
+
 use crate::crc::Crc;
 
 /// The ChunkCode consists in four bytes whose values are between 65-90 and 97-122 decimal, so
@@ -23,7 +25,7 @@ use crate::crc::Crc;
 /// - 4th byte: 0: not safe to copy, 1: save to copy (related to PNG
 /// editors and they should handle unrecognized chunks: if it is unsafe to copy, it means the
 /// chunk is dependent on the image data, and if the image was modified, it it no longer valid)
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ChunkType([u8; 4]);
 
 pub const IHDR: ChunkType = ChunkType([73, 72, 68, 82]);
@@ -82,7 +84,6 @@ pub trait Chunk {
     fn to_bytes(&self, crc: &Crc) -> Vec<u8> {
         let data_size = self.data_size();
 
-        use std::mem::size_of;
         let mut bytes =
             Vec::with_capacity(size_of::<ChunkType>() + data_size as usize + 2 * size_of::<u32>());
         bytes.extend_from_slice(&data_size.to_be_bytes());
@@ -141,39 +142,40 @@ pub struct ImageHeader {
 }
 
 impl ImageHeader {
-    // TODO:
-    // fn from_chunk<T: Chunk>(chunk: &T) -> Self {
-    //     Self {
-    //         width: u32::from_be_bytes(chunk.data[0 .. 4].try_into().unwrap()),
-    //         height: u32::from_be_bytes(chunk.data[4 .. 8].try_into().unwrap()),
-    //         bit_depth: chunk.data[8],
-    //         compression: chunk.data[9],
-    //         filter: chunk.data[10],
-    //         interlace: chunk.data[11],
-    //     }
-    // }
+    pub fn new(data: &[u8]) -> Self {
+        Self {
+            width: u32::from_be_bytes(data[0..4].try_into().unwrap()),
+            height: u32::from_be_bytes(data[4..8].try_into().unwrap()),
+            bit_depth: data[8],
+            compression: data[9],
+            filter: data[10],
+            interlace: data[11],
+        }
+    }
+}
+
+impl Chunk for ImageHeader {
+    fn data_size(&self) -> u32 {
+        size_of::<ImageHeader>() as u32
+    }
+
+    fn get_type(&self) -> ChunkType {
+        IHDR
+    }
+
+    fn data_to_bytes(&self) -> Vec<u8> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 /// This function returns the most apropiated Chunk for the data read.
 /// The first 4 bytes are considered as the type and the rest are data.
-pub fn from_bytes(_bytes: &[u8]) -> Box<dyn Chunk> {
-    unimplemented!();
+pub fn from_bytes(bytes: &[u8]) -> Box<dyn Chunk> {
+    match ChunkType::from_slice(&bytes[..4]) {
+        Ok(IHDR) => Box::new(ImageHeader::new(&bytes[4..])),
+        Ok(other) => Box::new(GenericChunk::new(other, &bytes[4..])),
+        Err(error) => unreachable!("{}", error),
+    }
 }
-
-// fn from_bytes(size: usize, data: &[u8]) -> Self {
-//     assert_eq!(
-//         size + 8,
-//         data.len(),
-//         "The data length should be {}, got {}",
-//         size + 8,
-//         data.len()
-//     );
-
-//     Self {
-//         chunk_type: ChunkCode::from_slice(&data[..4]).unwrap(),
-//         data: data[4..4 + size].to_owned(),
-//         crc: u32::from_be_bytes(data[size + 4..].try_into().unwrap()),
-//     }
-// }
