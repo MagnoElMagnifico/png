@@ -1,7 +1,11 @@
 use std::{env, path::Path, process};
 
+mod chunks;
+mod crc;
 mod png;
-use png::{Chunk, ChunkCode, Png};
+
+use crate::chunks::{ChunkType, GenericChunk};
+use crate::png::Png;
 
 fn main() {
     let mut args = env::args();
@@ -24,10 +28,10 @@ fn main() {
 
     png.chunks.insert(
         1,
-        Chunk::new(
-            ChunkCode::from_code("teSt"),
+        Box::new(GenericChunk::new(
+            ChunkType::from_code("teSt"),
             "*secret code here*".as_bytes(),
-        ),
+        )),
     );
     png.write(Path::new("./output.png")).unwrap();
 }
