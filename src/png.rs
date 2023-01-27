@@ -1,8 +1,7 @@
 use crate::{chunks, chunks::Chunk, crc::Crc};
 use std::{fs, io, mem::size_of, path::Path};
 
-// Signature and common ChunkCodes
-// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Chunks.html
+// Signature
 pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
 /// A PNG consists in a signature (that every PNG should have) and a series of chunks, that may be
