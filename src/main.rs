@@ -45,16 +45,20 @@ mod tests {
         let mut png = Png::empty();
 
         png.chunks
-            .push(Box::new(ImageHeader::new((1, 1), 8, 2, false)));
+            .push(Box::new(ImageHeader::new((100, 100), 8, 2, false)));
         png.chunks.push(Box::new(GenericChunk::from_bytes(
             IDAT,
-            &[
-                0, // Filter method
-                0, 0, 0, // Pixel
-            ],
+            &[0; 100 + 100 * 100],
         )));
         png.chunks.push(Box::new(ImageTrailer));
 
         png.write(Path::new("generated.png")).unwrap();
+    }
+
+    #[test]
+    fn read_png() {
+        let path = Path::new("/home/magno/Prog/png/assets/good_normal_one-black-pixel.png");
+        let png = Png::read(path).unwrap();
+        println!("{:#?}", png.chunks);
     }
 }

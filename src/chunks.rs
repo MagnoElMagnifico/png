@@ -5,7 +5,7 @@
 //! - length of the data section: u32
 //! - chunk type code: u32
 //! - chunk data section
-//! - cyclic redundency check
+//! - cyclic redundency check: u32
 //!
 //! Note that the bytes (u32) are stored in Big-Endian
 
@@ -84,8 +84,7 @@ pub trait Chunk: std::fmt::Debug {
     fn to_bytes(&self, crc: &Crc) -> Vec<u8> {
         let data_size = self.data_size();
 
-        let mut bytes =
-            Vec::with_capacity(size_of::<ChunkType>() + data_size as usize + 2 * size_of::<u32>());
+        let mut bytes = Vec::with_capacity(data_size as usize + 3 * size_of::<u32>());
         bytes.extend_from_slice(&data_size.to_be_bytes());
         bytes.extend_from_slice(&self.get_type().0);
         bytes.extend_from_slice(&self.data_to_bytes());
@@ -212,7 +211,7 @@ impl ImageHeader {
 
 impl Chunk for ImageHeader {
     fn data_size(&self) -> u32 {
-        size_of::<ImageHeader>() as u32
+        13
     }
 
     fn get_type(&self) -> ChunkType {
@@ -220,10 +219,11 @@ impl Chunk for ImageHeader {
     }
 
     fn data_to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(self.data_size() as usize);
+        let mut bytes = Vec::with_capacity(13);
         bytes.extend_from_slice(&self.width.to_be_bytes());
         bytes.extend_from_slice(&self.height.to_be_bytes());
         bytes.push(self.bit_depth);
+        bytes.push(self.color_type);
         bytes.push(self.compression);
         bytes.push(self.filter);
         bytes.push(self.interlace);
@@ -247,7 +247,7 @@ impl Chunk for ImageTrailer {
     }
 
     fn data_to_bytes(&self) -> Vec<u8> {
-        vec![0]
+        vec![]
     }
 }
 
