@@ -14,6 +14,13 @@ pub struct Png {
 }
 
 impl Png {
+    pub fn empty() -> Self {
+        Self {
+            chunks: Vec::with_capacity(3),
+            crc: Crc::new(),
+        }
+    }
+
     pub fn read(input_file: &Path) -> io::Result<Self> {
         let file_data = fs::read(input_file)?;
 
@@ -27,10 +34,7 @@ impl Png {
         }
         p += 8;
 
-        let mut png = Self {
-            chunks: Vec::with_capacity(3),
-            crc: Crc::new(),
-        };
+        let mut png = Self::empty();
 
         loop {
             // Read chunk data size

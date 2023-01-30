@@ -107,7 +107,7 @@ pub struct GenericChunk {
 }
 
 impl GenericChunk {
-    pub fn new(chunk_type: ChunkType, data: &[u8]) -> Self {
+    pub fn from_bytes(chunk_type: ChunkType, data: &[u8]) -> Self {
         Self {
             chunk_type,
             data: data.to_owned(),
@@ -184,7 +184,20 @@ pub struct ImageHeader {
 }
 
 impl ImageHeader {
-    pub fn new(data: &[u8]) -> Self {
+    pub fn new(size: (u32, u32), bit_depth: u8, color_type: u8, adam7_interlace: bool) -> Self {
+        Self {
+            width: size.0,
+            height: size.1,
+            bit_depth,
+            color_type,
+            compression: 0,
+            filter: 0,
+            interlace: if adam7_interlace { 1 } else { 0 },
+        }
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Self {
+        // TODO: check data len
         Self {
             width: u32::from_be_bytes(data[0..4].try_into().unwrap()),
             height: u32::from_be_bytes(data[4..8].try_into().unwrap()),
@@ -217,11 +230,12 @@ impl Chunk for ImageHeader {
         bytes
     }
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 
 /// IEND describes the end of the PNG. It must be empty.
 #[derive(Debug, Copy, Clone)]
-struct ImageTrailer;
+pub struct ImageTrailer;
 
 impl Chunk for ImageTrailer {
     fn data_size(&self) -> u32 {
@@ -233,9 +247,8 @@ impl Chunk for ImageTrailer {
     }
 
     fn data_to_bytes(&self) -> Vec<u8> {
-        vec![ 0 ]
+        vec![0]
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -244,9 +257,9 @@ impl Chunk for ImageTrailer {
 /// The first 4 bytes are considered as the type and the rest are data.
 pub fn from_bytes(bytes: &[u8]) -> Box<dyn Chunk> {
     match ChunkType::from_slice(&bytes[..4]) {
-        Ok(IHDR) => Box::new(ImageHeader::new(&bytes[4..])),
+        Ok(IHDR) => Box::new(ImageHeader::from_bytes(&bytes[4..])),
         Ok(IEND) => Box::new(ImageTrailer {}),
-        Ok(other) => Box::new(GenericChunk::new(other, &bytes[4..])),
+        Ok(other) => Box::new(GenericChunk::from_bytes(other, &bytes[4..])),
         Err(error) => unreachable!("{}", error),
     }
 }
