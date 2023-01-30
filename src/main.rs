@@ -3,8 +3,8 @@ mod crc;
 mod filter;
 mod png;
 
-use std::{env, path::Path, process::exit};
 use crate::png::Png;
+use std::{env, path::Path, process::exit};
 
 fn main() {
     let mut args = env::args();
@@ -31,9 +31,9 @@ fn main() {
 // These tests have to be checked manually opening the PNG output for the moment.
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use crate::chunks::{IDAT, ImageTrailer, GenericChunk, ImageHeader};
+    use crate::chunks::{GenericChunk, ImageHeader, ImageTrailer, IDAT};
     use crate::png::Png;
+    use std::path::Path;
 
     #[test]
     fn open_png() {
@@ -44,12 +44,17 @@ mod tests {
     fn create_png() {
         let mut png = Png::empty();
 
-        png.chunks.push(Box::new(ImageHeader::new((1, 1), 8, 2, false)));
-        png.chunks.push(Box::new(GenericChunk::from_bytes(IDAT, &[
-                                                          0, 0, 0
-        ])));
+        png.chunks
+            .push(Box::new(ImageHeader::new((1, 1), 8, 2, false)));
+        png.chunks.push(Box::new(GenericChunk::from_bytes(
+            IDAT,
+            &[
+                0, // Filter method
+                0, 0, 0, // Pixel
+            ],
+        )));
         png.chunks.push(Box::new(ImageTrailer));
 
-        png.write(Path::new("generated.png"));
+        png.write(Path::new("generated.png")).unwrap();
     }
 }
