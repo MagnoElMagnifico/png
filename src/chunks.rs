@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 //! Each chunk has the following structure:
 //!
 //! - length of the data section: u32
@@ -138,8 +137,12 @@ impl Chunk for GenericChunk {
 ///  - Bit Depth (1 byte) : is the number of bits per sample or per palette index (not per pixel). Valid values
 ///    are 1, 2, 4, 8, and 16, although not all values are allowed for all color types.
 ///
-///  - Color type (1 byte): represent sums of the following values: 1 (palette used), 2 (color
-///    used), and 4 (alpha channel used). Valid values are 0, 2, 3, 4, and 6.
+///  - Color type (1 byte): represent sums of the following values:
+///        - 0: Grayscale used
+///        - 1: Palette used         (1st bit set)
+///        - 2: Color used           (2nd bit set)
+///        - 4: Alpha channel used   (3rd bit set)
+///    Valid values are 0, 2, 3, 4, and 6.
 ///
 ///  - Compression method (1 byte): indicates the method used to compress the image data. At
 ///    present, only compression method 0 (deflate/inflate compression with a sliding window of at
@@ -155,22 +158,13 @@ impl Chunk for GenericChunk {
 /// Bit depth restrictions for each color type are imposed to simplify implementations and to
 /// prohibit combinations that do not compress well:
 ///
-/// ```
-/// Color    Allowed     Interpretation
-/// Type     Bit Depths
-///  0       1,2,4,8,16  Each pixel is a grayscale sample.
-///  2       8,16        Each pixel is an R,G,B triple.
-///  3       1,2,4,8     Each pixel is a palette index;
-///                      a PLTE chunk must appear.
-///  4       8,16        Each pixel is a grayscale sample,
-///                      followed by an alpha sample.
-///  6       8,16        Each pixel is an R,G,B triple,
-///                      followed by an alpha sample.
-/// ```
-///
-/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Compression.html
-/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-Filters.html
-/// TODO: http://libpng.org/pub/png/spec/1.2/PNG-DataRep.html#DR.Interlaced-data-order
+/// | PNG image type        | Color type | Allowed bit depths | Interpretation                                                  |
+/// |:----------------------|:-----------|:-------------------|:----------------------------------------------------------------|
+/// | Greyscale             | 0          | 1, 2, 4, 8, 16     | Each pixel is a greyscale sample                                |
+/// | Truecolour            | 2          | 8, 16              | Each pixel is an R,G,B triple                                   |
+/// | Indexed-colour        | 3          | 1, 2, 4, 8         | Each pixel is a palette index; a PLTE chunk shall appear.       |
+/// | Greyscale with alpha  | 4          | 8, 16              | Each pixel is a greyscale sample followed by an alpha sample.   |
+/// | Truecolour with alpha | 6          | 8, 16              | Each pixel is an R,G,B triple followed by an alpha sample.      |
 #[derive(Debug, Copy, Clone, Default)]
 pub struct ImageHeader {
     pub width: u32,
@@ -184,6 +178,7 @@ pub struct ImageHeader {
 
 impl ImageHeader {
     pub fn new(size: (u32, u32), bit_depth: u8, color_type: u8, adam7_interlace: bool) -> Self {
+        // TODO: check for valid combinations of bit_depth and color_type
         Self {
             width: size.0,
             height: size.1,
@@ -196,7 +191,13 @@ impl ImageHeader {
     }
 
     pub fn from_bytes(data: &[u8]) -> Self {
-        // TODO: check data len
+        assert_eq!(
+            data.len(),
+            13,
+            "ImageHeader must be 13 bytes long, got {}",
+            data.len()
+        );
+        // TODO: check for valid combinations of bit_depth and color_type
         Self {
             width: u32::from_be_bytes(data[0..4].try_into().unwrap()),
             height: u32::from_be_bytes(data[4..8].try_into().unwrap()),

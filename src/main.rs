@@ -36,11 +36,6 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn open_png() {
-        todo!();
-    }
-
-    #[test]
     fn create_png() {
         let mut png = Png::empty();
 
@@ -56,6 +51,7 @@ mod tests {
     }
 
     #[test]
+    // cargo test read_png -- --show-output
     fn read_png() {
         let path = Path::new("/home/magno/Prog/png/assets/good_normal_one-black-pixel.png");
         let png = Png::read(path).unwrap();
