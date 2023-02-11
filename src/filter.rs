@@ -1,50 +1,106 @@
+#![allow(dead_code)]
 //! Algorithms that prepare the image data for optimum compression, because it can significantly
 //! reduce the resultant size.
 //!
 //! PNG filter method 0 (described by IHDR, the only one as for PNG 1.2) defines five basic filter
 //! types:
 //!
-//! ```
-//! 0   None
-//! 1   Sub
-//! 2   Up
-//! 3   Average
-//! 4   Paeth
-//! ```
+//!   0. None
+//!   1. Sub
+//!   2. Up
+//!   3. Average
+//!   4. Paeth
+//!
+//! These are applied to scanlines: a 1-pixel-high sequence starting at the far left and ending at
+//! the far right of the image.
+//!
+//! Note that these functions also add the filter-type byte of the method. The inverse functions
+//! also take in this byte and remove it from the output.
+//!
+//! `Raw(pos)`: unfiltered data byte in position pos (if `x < 0`, asume `Raw(x) = 0`)
+
+use std::num::Wrapping;
+
+/// bpp stands for bytes per complete pixel, rounding up to 1. It depends on the bit depth and
+/// color type set on the IHDR chunk.
+///
+/// Examples:
+///
+/// - Color type 2, bit depth 16 => `bpp` is 6 (three samples, two bytes per sample)
+/// - Color type 0, bit depth 2  => `bpp` is 1 (rounding up)
+/// - Color type 4, bit depth 16 => `bpp` is 4 (two-byte greyscale sample, plus two-byte alpha sample).
+pub fn bytes_per_pixel(color_type: u8, bit_depth: u8) -> u8 {
+    let mut n_samples = 1;                     // Grayscale or index: 1 sample
+    n_samples += color_type & (1 << 1);        // RGB: +2 samples (not shift back, it is multiplied by 2)
+    n_samples += (color_type & (1 << 2)) >> 2; // Add 1 sample for alpha
+
+    // Bytes per sample
+    let bps = ((bit_depth & (1 << 4)) >> 4) + 1;  // If 16, 2 bytes. 1 byte otherwise.
+    n_samples * bps
+}
 
 /// Transmits the difference between each byte and the value of the corresponding byte of the prior
 /// pixel.
 ///
-/// Formula for each byte (being x a byte):
-///
-///     Sub(x) = Raw(x) - Raw(x - bpp)
+/// Formula for each byte (being x a byte): Sub(x) = Raw(x) - Raw(x - bpp)
 ///
 /// Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
-///
-/// Where
-///
-/// - `Raw(pos)`    raw data byte in position pos (if x < 0, asume Raw(x) = 0)
-/// - `bpp`         number of bytes per pixel
-///
-/// For example:
-///
-/// - For color type 2 with a bit depth of 16, `bpp` is equal to 6 (three samples, two bytes per
-///   sample)
-/// - For color type 0 with a bit depth of 2, `bpp` is equal to 1 (rounding up)
-/// - For color type 4 with a bit depth of 16, `bpp` is equal to 4 (two-byte greyscale sample, plus
-///   two-byte alpha sample).
-pub fn _sub(data: &mut [u8]) {
-    let _bpp = 0;
-    for (_x, _raw) in data.iter_mut().enumerate() {
-        // *raw -= *raw - data.get(x - bpp).unwrap_or(&0);
+pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut filtered = scanline.to_vec();
+
+    for (i, byte) in scanline.iter().enumerate() {
+        dbg!(i);
+        let byte = Wrapping(dbg!(*byte));
+
+        let previous_byte = if i <= bpp { 0 } else { scanline[ i - bpp ] };
+        let previous_byte = Wrapping(dbg!(previous_byte));
+
+        filtered[i] = (byte - previous_byte).0;
     }
+
+    filtered.insert(0, 1); // Add filter-type byte method for sub
+    filtered
 }
 
 /// The inverse of the sub filter: Sub(x) + Raw(x - bpp)
+pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
-pub fn _sub_inv(data: &mut [u8]) {
-    let _bpp = 0;
-    for (_x, _raw) in data.iter_mut().enumerate() {
-        // *raw += data.get(x - bpp).unwrap_or(&0);
+    for (i, byte) in filtered.iter().skip(1).enumerate() {
+        let byte = Wrapping(*byte);
+
+        let previous_byte = if i <= bpp { 0 } else { original[ i - bpp ] };
+        let previous_byte = Wrapping(previous_byte);
+
+        original[i] = (byte + previous_byte).0;
+    }
+
+    original
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bytes_per_pixel_test() {
+        // RGB => 3 samples, 2 bytes per sample
+        assert_eq!(bytes_per_pixel(2, 16), 6);
+        // Greyscale => 1 sample, 1 byte per sample
+        assert_eq!(bytes_per_pixel(0, 2), 1);
+        // Greyscale with alpha => 2 samples, 2 bytes per sample
+        assert_eq!(bytes_per_pixel(4, 16), 4);
+    }
+
+    #[test]
+    fn sub_and_sub_inv_test() {
+        let random_scanline = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let bpp = 1;
+
+        let filtered = dbg!(sub(&random_scanline, bpp));
+        let inverse  = sub_inv(&filtered, bpp);
+        assert_eq!(random_scanline, inverse);
     }
 }

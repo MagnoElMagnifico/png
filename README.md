@@ -13,7 +13,8 @@ Useful image inspector for debugging: [nayuki.io][ins]
 # PNG Basics
 
 The PNG format consists in a Signature and a series of chunks (PNG's read and
-write operations are defined in the `png` module).
+write operations are defined in the `png` module). This filetype is a Resource
+Interchange File Format (RIFF).
 
 Each chunk has the following structure (module `chunks`):
 
@@ -127,6 +128,49 @@ intensity.
 ## Interlaced
 ## Gamma
 # Text Strings
-# Compression
+
 # Filter algorithms
+
+Filtering algorithms are applied to IDAT chunks before compression to prepare
+the data in order to optimize the resultant size.
+
+The PNG filter method 0, described in the IHDR chunk, is a set of the following
+5 filter types.
+
+```
+0   None
+1   Sub
+2   Up
+3   Average
+4   Paeth
+```
+
+For the moment (PNG 1.2) this is the only filter method available.
+
+The data can be encoded with all these algorithms in a scanlines-by-scanline
+basis, thus the data send to compress is preceded by a filter-type byte that
+specifies the filter algorithm.
+
+![](https://www.w3.org/TR/2003/REC-PNG-20031110/figures/fig49.svg)
+Source: [w3](https://www.w3.org/TR/2003/REC-PNG-20031110/#4Concepts.EncodingFiltering)
+
+These are applied to the bytes that conform each scanline, not pixels. If the
+image includes an alpha channel, it is filtered in the same way.
+
+When the image is interlaced, each pass is treated as an independent image. **TODO**
+
+To decode some filters, you may need to use some of the previous decoded
+values, thus the scanline should be stored, sinde the next scanline might use a
+filter that refers to it.
+
+- `None()`: scanline unmodified, only necessary to insert a filter-type byte before the data.
+- `Sub()`: transmits the difference between each byte **TODO**
+- `Up()`:
+- `Average()`:
+- `Paeth()`:
+
+**TODO**: <http://www.libpng.org/pub/png/book/chapter09.html>
+
+
+# Compression
 

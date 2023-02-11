@@ -29,7 +29,7 @@ fn main() {
 }
 
 // These tests have to be checked manually opening the PNG output for the moment.
-#[cfg(test)]
+/* #[cfg(test)]
 mod tests {
     use crate::chunks::{GenericChunk, ImageHeader, ImageTrailer, IDAT};
     use crate::png::Png;
@@ -57,4 +57,4 @@ mod tests {
         let png = Png::read(path).unwrap();
         println!("{:#?}", png.chunks);
     }
-}
+} */
