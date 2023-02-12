@@ -30,12 +30,12 @@ use std::num::Wrapping;
 /// - Color type 0, bit depth 2  => `bpp` is 1 (rounding up)
 /// - Color type 4, bit depth 16 => `bpp` is 4 (two-byte greyscale sample, plus two-byte alpha sample).
 pub fn bytes_per_pixel(color_type: u8, bit_depth: u8) -> u8 {
-    let mut n_samples = 1;                     // Grayscale or index: 1 sample
-    n_samples += color_type & (1 << 1);        // RGB: +2 samples (not shift back, it is multiplied by 2)
+    let mut n_samples = 1; // Grayscale or index: 1 sample
+    n_samples += color_type & (1 << 1); // RGB: +2 samples (not shift back, it is multiplied by 2)
     n_samples += (color_type & (1 << 2)) >> 2; // Add 1 sample for alpha
 
     // Bytes per sample
-    let bps = ((bit_depth & (1 << 4)) >> 4) + 1;  // If 16, 2 bytes. 1 byte otherwise.
+    let bps = ((bit_depth & (1 << 4)) >> 4) + 1; // If 16, 2 bytes. 1 byte otherwise.
     n_samples * bps
 }
 
@@ -50,11 +50,10 @@ pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        dbg!(i);
-        let byte = Wrapping(dbg!(*byte));
+        let byte = Wrapping(*byte);
 
-        let previous_byte = if i <= bpp { 0 } else { scanline[ i - bpp ] };
-        let previous_byte = Wrapping(dbg!(previous_byte));
+        let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
+        let previous_byte = Wrapping(previous_byte);
 
         filtered[i] = (byte - previous_byte).0;
     }
@@ -71,7 +70,7 @@ pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
     for (i, byte) in filtered.iter().skip(1).enumerate() {
         let byte = Wrapping(*byte);
 
-        let previous_byte = if i <= bpp { 0 } else { original[ i - bpp ] };
+        let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
         let previous_byte = Wrapping(previous_byte);
 
         original[i] = (byte + previous_byte).0;
@@ -96,11 +95,19 @@ mod tests {
 
     #[test]
     fn sub_and_sub_inv_test() {
-        let random_scanline = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let random_scanline = vec![4, 5, 6, 7, 8, 9, 10, 11, 12];
         let bpp = 1;
 
-        let filtered = dbg!(sub(&random_scanline, bpp));
-        let inverse  = sub_inv(&filtered, bpp);
+        // With this example, you can clearly see the power of this filter.
+        //
+        // For a sequence of values that change with a regular pattern, they can be stored as
+        // distances, therefore similar values and easier to compress. Moreover, it is a reversible
+        // operation.
+        //
+        // In this case, the filtered scanline should be [1, 4, 1, 1, 1, 1, 1, 1, 1, 1].
+
+        let filtered = sub(&random_scanline, bpp);
+        let inverse = sub_inv(&filtered, bpp);
         assert_eq!(random_scanline, inverse);
     }
 }
