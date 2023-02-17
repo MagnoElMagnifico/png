@@ -112,7 +112,7 @@ pub fn up(scanline: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
 pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
-    for (i, byte) in prior_scanline.iter().skip(1).enumerate() {
+    for (i, byte) in filtered.iter().skip(1).enumerate() {
         let byte = Wrapping(*byte);
 
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
@@ -154,5 +154,21 @@ mod tests {
         let filtered = sub(&random_scanline, bpp);
         let inverse = sub_inv(&filtered, bpp);
         assert_eq!(random_scanline, inverse);
+    }
+
+    #[test]
+    fn up_and_up_inv_test() {
+        let prior_scanline     = vec![41, 123, 1, 54, 127, 230, 69];
+        let scanline_to_filter = vec![42, 124, 2, 55, 128, 231, 70];
+
+        let filtered = up(&scanline_to_filter, &prior_scanline);
+        let inverse  = up_inv(&filtered, &prior_scanline);
+        assert_eq!(scanline_to_filter, inverse);
+
+        // Now test if the scanline were the first
+        let filtered = up(&scanline_to_filter, &[]);
+        let inverse  = up_inv(&dbg!(filtered), &[]);
+        assert_eq!(scanline_to_filter, inverse);
+
     }
 }
