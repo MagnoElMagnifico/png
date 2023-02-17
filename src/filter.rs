@@ -18,6 +18,9 @@
 //! also take in this byte and remove it from the output.
 //!
 //! `Raw(pos)`: unfiltered data byte in position pos (if `x < 0`, asume `Raw(x) = 0`)
+//!
+//! Therefore, to filter the whole image, go from the bottom to the top. To decode the image, from
+//! top to bottom.
 
 use std::num::Wrapping;
 
@@ -62,7 +65,7 @@ pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
     filtered
 }
 
-/// The inverse of the sub filter: Sub(x) + Raw(x - bpp)
+/// The inverse of the `sub` filter: `Sub(x) + Raw(x - bpp) `
 pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
     let bpp = bpp as usize;
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
@@ -74,6 +77,48 @@ pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
         let previous_byte = Wrapping(previous_byte);
 
         original[i] = (byte + previous_byte).0;
+    }
+
+    original
+}
+
+/// Similar to the `Sub()` filter, except that the pixel immediately above the current one, rather
+/// than just to its left, is used. Note that this scanline should be unfiltered.
+///
+/// Formula for each byte (being x a byte): `Up(x) = Raw(x) - Prior(x)`
+///
+/// Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
+///
+/// If a prior scanline cannot be found, 0 will be assumed.
+pub fn up(scanline: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
+    let mut filtered = scanline.to_vec();
+
+    for (i, byte) in scanline.iter().enumerate() {
+        let byte = Wrapping(*byte);
+
+        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
+        let prior_byte = Wrapping(*prior_byte);
+
+        filtered[i] = (byte - prior_byte).0;
+    }
+
+    filtered.insert(0, 2);  // Add filter-type byte method for up
+    filtered
+
+}
+
+/// The inverse of the `up` filter: `Up(x) + Prior(x)`
+/// NOTE: `Prior()` are decoded bytes
+pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
+    let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
+
+    for (i, byte) in prior_scanline.iter().skip(1).enumerate() {
+        let byte = Wrapping(*byte);
+
+        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
+        let prior_byte = Wrapping(*prior_byte);
+
+        original[i] = (byte + prior_byte).0;
     }
 
     original
