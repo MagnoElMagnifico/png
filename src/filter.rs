@@ -21,6 +21,8 @@
 //!
 //! Therefore, to filter the whole image, go from the bottom to the top. To decode the image, from
 //! top to bottom.
+//!
+//! Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
 
 use std::num::Wrapping;
 
@@ -45,38 +47,36 @@ pub fn bytes_per_pixel(color_type: u8, bit_depth: u8) -> u8 {
 /// Transmits the difference between each byte and the value of the corresponding byte of the prior
 /// pixel.
 ///
-/// Formula for each byte (being x a byte): Sub(x) = Raw(x) - Raw(x - bpp)
+/// Formula for each byte (being x a byte):
 ///
-/// Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
+/// ```
+/// Sub(x) = Raw(x) - Raw(x - bpp)
+/// ```
 pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
     let bpp = bpp as usize;
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        let byte = Wrapping(*byte);
-
         let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        let previous_byte = Wrapping(previous_byte);
-
-        filtered[i] = (byte - previous_byte).0;
+        filtered[i] = (Wrapping(*byte) - Wrapping(previous_byte)).0;
     }
 
     filtered.insert(0, 1); // Add filter-type byte method for sub
     filtered
 }
 
-/// The inverse of the `sub` filter: `Sub(x) + Raw(x - bpp) `
+/// The inverse of the `sub` filter:
+///
+/// ```
+/// Sub(x) + Raw(x - bpp)
+/// ```
 pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
     let bpp = bpp as usize;
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
-        let byte = Wrapping(*byte);
-
         let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
-        let previous_byte = Wrapping(previous_byte);
-
-        original[i] = (byte + previous_byte).0;
+        original[i] = (Wrapping(*byte) + Wrapping(previous_byte)).0;
     }
 
     original
@@ -85,21 +85,19 @@ pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
 /// Similar to the `Sub()` filter, except that the pixel immediately above the current one, rather
 /// than just to its left, is used. Note that this scanline should be unfiltered.
 ///
-/// Formula for each byte (being x a byte): `Up(x) = Raw(x) - Prior(x)`
+/// Formula for each byte (being x a byte):
 ///
-/// Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
+/// ```
+/// Up(x) = Raw(x) - Prior(x)
+/// ```
 ///
 /// If a prior scanline cannot be found, 0 will be assumed.
 pub fn up(scanline: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        let byte = Wrapping(*byte);
-
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        let prior_byte = Wrapping(*prior_byte);
-
-        filtered[i] = (byte - prior_byte).0;
+        filtered[i] = (Wrapping(*byte) - Wrapping(*prior_byte)).0;
     }
 
     filtered.insert(0, 2);  // Add filter-type byte method for up
@@ -113,12 +111,50 @@ pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
-        let byte = Wrapping(*byte);
-
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        let prior_byte = Wrapping(*prior_byte);
+        original[i] = (Wrapping(*byte) + Wrapping(*prior_byte)).0;
+    }
 
-        original[i] = (byte + prior_byte).0;
+    original
+}
+
+/// Mix of the methods `Sub()` and `Up()`: takes the average of the left and above pixel.
+///
+/// ```
+/// Average(x) = Raw(x) - floor( (Raw(x - bpp) + Prior(x)) / 2)
+/// ```
+///
+/// However, the sum Raw(x-bpp)+Prior(x) must be formed without overflow (using at least nine-bit arithmetic).
+/// floor() could be integer division or >> 2
+pub fn average(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut filtered = scanline.to_vec();
+
+    for (i, byte) in scanline.iter().enumerate() {
+        let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
+        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
+        let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
+
+        filtered[i] = (Wrapping(*byte) - Wrapping(floor as u8)).0;
+    }
+
+    filtered.insert(0, 3);
+    filtered
+}
+
+/// ```
+/// Average(x) + floor((Raw(x-bpp)+Prior(x))/2)
+/// ```
+pub fn average_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut original = filtered[1..].to_vec();
+
+    for (i, byte) in filtered.iter().skip(1).enumerate() {
+        let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
+        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
+        let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
+
+        original[i] = (Wrapping(*byte) + Wrapping(floor as u8)).0;
     }
 
     original
@@ -139,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn sub_and_sub_inv_test() {
+    fn sub_test() {
         let random_scanline = vec![4, 5, 6, 7, 8, 9, 10, 11, 12];
         let bpp = 1;
 
@@ -157,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn up_and_up_inv_test() {
+    fn up_test() {
         let prior_scanline     = vec![41, 123, 1, 54, 127, 230, 69];
         let scanline_to_filter = vec![42, 124, 2, 55, 128, 231, 70];
 
@@ -167,8 +203,23 @@ mod tests {
 
         // Now test if the scanline were the first
         let filtered = up(&scanline_to_filter, &[]);
-        let inverse  = up_inv(&dbg!(filtered), &[]);
+        let inverse  = up_inv(&filtered, &[]);
         assert_eq!(scanline_to_filter, inverse);
+    }
 
+    #[test]
+    fn average_test() {
+        let prior_scanline = vec![1, 2, 3, 4, 5, 6, 8, 9];
+        let scanline       = vec![6, 10, 7, 9, 9, 12, 2, 14];
+        let bpp = 1;
+
+        let filtered = average(&scanline, &prior_scanline, bpp);
+        let inverse  = average_inv(&filtered, &prior_scanline, bpp);
+        assert_eq!(scanline, inverse);
+
+        // Now test if the scanline were the first
+        let filtered = up(&scanline, &[]);
+        let inverse  = up_inv(&filtered, &[]);
+        assert_eq!(scanline, inverse);
     }
 }
