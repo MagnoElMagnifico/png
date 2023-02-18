@@ -24,8 +24,6 @@
 //!
 //! Unsigned arithmetic modulo 256 is used, so both inputs and outputs fit into into bytes.
 
-use std::num::Wrapping;
-
 /// bpp stands for bytes per complete pixel, rounding up to 1. It depends on the bit depth and
 /// color type set on the IHDR chunk.
 ///
@@ -58,7 +56,7 @@ pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in scanline.iter().enumerate() {
         let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        filtered[i] = (Wrapping(*byte) - Wrapping(previous_byte)).0;
+        filtered[i] = byte.wrapping_sub(previous_byte);
     }
 
     filtered.insert(0, 1); // Add filter-type byte method for sub
@@ -76,7 +74,7 @@ pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
         let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
-        original[i] = (Wrapping(*byte) + Wrapping(previous_byte)).0;
+        original[i] = byte.wrapping_add(previous_byte);
     }
 
     original
@@ -97,7 +95,7 @@ pub fn up(scanline: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
 
     for (i, byte) in scanline.iter().enumerate() {
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        filtered[i] = (Wrapping(*byte) - Wrapping(*prior_byte)).0;
+        filtered[i] = byte.wrapping_sub(*prior_byte);
     }
 
     filtered.insert(0, 2);  // Add filter-type byte method for up
@@ -112,7 +110,7 @@ pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        original[i] = (Wrapping(*byte) + Wrapping(*prior_byte)).0;
+        original[i] = byte.wrapping_add(*prior_byte);
     }
 
     original
@@ -135,7 +133,7 @@ pub fn average(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
         let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
 
-        filtered[i] = (Wrapping(*byte) - Wrapping(floor as u8)).0;
+        filtered[i] = byte.wrapping_sub(floor as u8);
     }
 
     filtered.insert(0, 3);
@@ -154,7 +152,7 @@ pub fn average_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
         let prior_byte = prior_scanline.get(i).unwrap_or(&0);
         let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
 
-        original[i] = (Wrapping(*byte) + Wrapping(floor as u8)).0;
+        original[i] = byte.wrapping_add(floor as u8);
     }
 
     original
