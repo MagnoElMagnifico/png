@@ -33,7 +33,7 @@
 /// - Color type 0, bit depth 2  => `bpp` is 1 (rounding up)
 /// - Color type 4, bit depth 16 => `bpp` is 4 (two-byte greyscale sample, plus two-byte alpha sample).
 pub fn bytes_per_pixel(color_type: u8, bit_depth: u8) -> u8 {
-    let mut n_samples = 1; // Grayscale or index: 1 sample
+    let mut n_samples = 1; // Greyscale or index: 1 sample
     n_samples += color_type & (1 << 1); // RGB: +2 samples (not shift back, it is multiplied by 2)
     n_samples += (color_type & (1 << 2)) >> 2; // Add 1 sample for alpha
 
@@ -55,8 +55,8 @@ pub fn sub(scanline: &[u8], bpp: u8) -> Vec<u8> {
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        filtered[i] = byte.wrapping_sub(previous_byte);
+        let left_byte = if i < bpp { 0 } else { scanline[i - bpp] };
+        filtered[i] = byte.wrapping_sub(left_byte);
     }
 
     filtered.insert(0, 1); // Add filter-type byte method for sub
@@ -73,8 +73,8 @@ pub fn sub_inv(filtered: &[u8], bpp: u8) -> Vec<u8> {
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
-        let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
-        original[i] = byte.wrapping_add(previous_byte);
+        let left_byte = if i < bpp { 0 } else { original[i - bpp] };
+        original[i] = byte.wrapping_add(left_byte);
     }
 
     original
@@ -94,13 +94,12 @@ pub fn up(scanline: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        filtered[i] = byte.wrapping_sub(*prior_byte);
+        let top_byte = prior_scanline.get(i).unwrap_or(&0);
+        filtered[i] = byte.wrapping_sub(*top_byte);
     }
 
-    filtered.insert(0, 2);  // Add filter-type byte method for up
+    filtered.insert(0, 2); // Add filter-type byte method for up
     filtered
-
 }
 
 /// The inverse of the `up` filter: `Up(x) + Prior(x)`
@@ -109,8 +108,8 @@ pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
     let mut original = filtered[1..].to_vec(); // Ignore filter-type byte
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
-        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        original[i] = byte.wrapping_add(*prior_byte);
+        let top_byte = prior_scanline.get(i).unwrap_or(&0);
+        original[i] = byte.wrapping_add(*top_byte);
     }
 
     original
@@ -121,17 +120,14 @@ pub fn up_inv(filtered: &[u8], prior_scanline: &[u8]) -> Vec<u8> {
 /// ```
 /// Average(x) = Raw(x) - floor( (Raw(x - bpp) + Prior(x)) / 2)
 /// ```
-///
-/// However, the sum Raw(x-bpp)+Prior(x) must be formed without overflow (using at least nine-bit arithmetic).
-/// floor() could be integer division or >> 2
 pub fn average(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
     let bpp = bpp as usize;
     let mut filtered = scanline.to_vec();
 
     for (i, byte) in scanline.iter().enumerate() {
-        let previous_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
+        let left_byte = if i < bpp { 0 } else { scanline[i - bpp] };
+        let top_byte = prior_scanline.get(i).unwrap_or(&0);
+        let floor = (left_byte as u16 + *top_byte as u16) >> 2;
 
         filtered[i] = byte.wrapping_sub(floor as u8);
     }
@@ -140,6 +136,8 @@ pub fn average(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
     filtered
 }
 
+/// Inverse of the `Average()` filter:
+///
 /// ```
 /// Average(x) + floor((Raw(x-bpp)+Prior(x))/2)
 /// ```
@@ -148,14 +146,70 @@ pub fn average_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
     let mut original = filtered[1..].to_vec();
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
-        let previous_byte = if i < bpp { 0 } else { original[i - bpp] };
-        let prior_byte = prior_scanline.get(i).unwrap_or(&0);
-        let floor = (previous_byte as u16 + *prior_byte as u16) >> 2;
+        let left_byte = if i < bpp { 0 } else { original[i - bpp] };
+        let top_byte = prior_scanline.get(i).unwrap_or(&0);
+        let floor = (left_byte as u16 + *top_byte as u16) >> 2;
 
         original[i] = byte.wrapping_add(floor as u8);
     }
 
     original
+}
+
+/// The Paeth filter computes a simple linear function of the three neighbouring pixels, and then
+/// chooses the pixel closest to the computed value.
+///
+/// ```
+/// Paeth(x) = Raw(x) - PaethPredictor(Raw(x-bpp), Prior(x), Prior(x-bpp))
+/// ```
+pub fn paeth(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut filtered = scanline.to_vec();
+
+    for (i, byte) in scanline.iter().enumerate() {
+        let left_byte = if i < bpp { 0 } else { scanline[i - bpp] };
+        let upleft_byte = if i < bpp { 0 } else { prior_scanline[i - bpp] };
+        let top_byte = *prior_scanline.get(i).unwrap_or(&0);
+
+        filtered[i] = byte.wrapping_sub(paeth_predictor(left_byte, top_byte, upleft_byte));
+    }
+
+    filtered.insert(0, 4);
+    filtered
+}
+
+/// ```
+/// Paeth(x) + PaethPredictor(Raw(x-bpp), Prior(x), Prior(x-bpp))
+/// ```
+pub fn paeth_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
+    let bpp = bpp as usize;
+    let mut original = filtered[1..].to_vec();
+
+    for (i, byte) in filtered.iter().skip(1).enumerate() {
+        let left_byte = if i < bpp { 0 } else { original[i - bpp] };
+        let upleft_byte = if i < bpp { 0 } else { prior_scanline[i - bpp] };
+        let top_byte = *prior_scanline.get(i).unwrap_or(&0);
+
+        original[i] = byte.wrapping_add(paeth_predictor(left_byte, top_byte, upleft_byte));
+    }
+
+    original
+}
+
+fn paeth_predictor(left: u8, top: u8, upleft: u8) -> u8 {
+    let p = left + top - upleft;
+
+    let dist_left = u8::abs_diff(p, left);
+    let dist_top = u8::abs_diff(p, top);
+    let dist_upleft = u8::abs_diff(p, upleft);
+
+    if dist_left <= dist_top {
+        left
+    } else if dist_top <= dist_upleft {
+        top
+    } else {
+        upleft
+    }
 }
 
 #[cfg(test)]
@@ -192,32 +246,32 @@ mod tests {
 
     #[test]
     fn up_test() {
-        let prior_scanline     = vec![41, 123, 1, 54, 127, 230, 69];
+        let prior_scanline = vec![41, 123, 1, 54, 127, 230, 69];
         let scanline_to_filter = vec![42, 124, 2, 55, 128, 231, 70];
 
         let filtered = up(&scanline_to_filter, &prior_scanline);
-        let inverse  = up_inv(&filtered, &prior_scanline);
+        let inverse = up_inv(&filtered, &prior_scanline);
         assert_eq!(scanline_to_filter, inverse);
 
         // Now test if the scanline were the first
         let filtered = up(&scanline_to_filter, &[]);
-        let inverse  = up_inv(&filtered, &[]);
+        let inverse = up_inv(&filtered, &[]);
         assert_eq!(scanline_to_filter, inverse);
     }
 
     #[test]
     fn average_test() {
         let prior_scanline = vec![1, 2, 3, 4, 5, 6, 8, 9];
-        let scanline       = vec![6, 10, 7, 9, 9, 12, 2, 14];
+        let scanline = vec![6, 10, 7, 9, 9, 12, 2, 14];
         let bpp = 1;
 
         let filtered = average(&scanline, &prior_scanline, bpp);
-        let inverse  = average_inv(&filtered, &prior_scanline, bpp);
+        let inverse = average_inv(&filtered, &prior_scanline, bpp);
         assert_eq!(scanline, inverse);
 
         // Now test if the scanline were the first
         let filtered = up(&scanline, &[]);
-        let inverse  = up_inv(&filtered, &[]);
+        let inverse = up_inv(&filtered, &[]);
         assert_eq!(scanline, inverse);
     }
 }
