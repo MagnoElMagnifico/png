@@ -1,12 +1,17 @@
 # PNG
 
 This project is a exploration of the PNG format. There are comments that
-summarize the [official specification][os].
+summarize the [official specification].
 
-Useful image inspector for debugging: [nayuki.io][ins]
+Useful image inspector for debugging: [nayuki.io]
 
-[os]: http://libpng.org/pub/png/spec/1.2/PNG-Contents.html
-[ins]: https://www.nayuki.io/page/png-file-chunk-inspector
+[official specification]: http://libpng.org/pub/png/spec/1.2/PNG-Contents.html
+[nayuki.io]: https://www.nayuki.io/page/png-file-chunk-inspector
+
+TODO: APNG (animated PNG) [APNG Wikipedia] [APNG Mozilla]
+
+[APNG Wikipedia]: https://en.wikipedia.org/wiki/APNG
+[APNG Mozilla]: https://wiki.mozilla.org/APNG_Specification
 
 -------------------------------------------------------------------------------
 
@@ -95,7 +100,7 @@ Standard keywords for text chunks:
 A PNG image is a rectangular pixel array, appearing left-to-right within each
 _scanline_, and these appearing top-to-bottom.
 
-However, the data may be transmitted in a different order, see [Interlaced][i].
+However, the data may be transmitted in a different order, see [Interlaced][PNG Interlaced].
 
 Pixels are always packed into these scanlines with no wasted bits between
 pixels. Pixels smaller than a byte never cross byte boundaries; they are packed
@@ -122,10 +127,16 @@ Sample values are not necessarily proportional to light intensity; the `gAMA`
 chunk specifies the relationship between sample values and display output
 intensity.
 
-[i]: http://libpng.org/pub/png/spec/1.2/PNG-DataRep.html#DR.Interlaced-data-order
 
 ## Alpha
+
+
 ## Interlaced
+
+[PNG Interlacing Wikipedia]: https://en.wikipedia.org/wiki/PNG#Interlacing
+[Adam7]: https://en.wikipedia.org/wiki/Adam7_algorithm
+[PNG Interlaced]: http://libpng.org/pub/png/spec/1.2/PNG-DataRep.html#DR.Interlaced-data-order
+
 ## Gamma
 # Text Strings
 
@@ -157,20 +168,71 @@ Source: [w3](https://www.w3.org/TR/2003/REC-PNG-20031110/#4Concepts.EncodingFilt
 These are applied to the bytes that conform each scanline, not pixels. If the
 image includes an alpha channel, it is filtered in the same way.
 
-When the image is interlaced, each pass is treated as an independent image. **TODO**
+When the image is interlaced, each pass is treated as an independent image (**TODO**)
+
+<!--
+Interlacing is also a bit of a wrench in the works. For the purposes of
+filtering, each interlace pass is treated as a separate image with its own
+width and height. For example, in a 256 × 256 interlaced image, the passes
+would be treated as seven smaller images with dimensions 32 × 32, 32 × 32, 64 ×
+32, 64 × 64, 128 × 64, 128 × 128, and 256 × 128, respectively.[69] This avoids
+the nasty problem of how to define corresponding bytes between rows of
+different widths.
+-->
 
 To decode some filters, you may need to use some of the previous decoded
-values, thus the scanline should be stored, sinde the next scanline might use a
+values, thus the scanline should be stored, since the next scanline might use a
 filter that refers to it.
 
 - `None()`: scanline unmodified, only necessary to insert a filter-type byte before the data.
-- `Sub()`: transmits the difference between each byte **TODO**
-- `Up()`:
-- `Average()`:
-- `Paeth()`:
+- `Sub()`: transmits the difference between the left pixel and the current one.
+- `Up()`: transmits the difference between the top pixel and the current one.
+- `Average()`: mix of the previous two, takes the average of the left and top pixel.
+- `Paeth()`: applies a simple linear function to the neighbouring pixels.
 
-**TODO**: <http://www.libpng.org/pub/png/book/chapter09.html>
+## How to choose a filtering method
+
+The first rule is that filters are rarely useful on palette images, so don't
+even bother with them.
+
+One has considerable freedom in choosing how to order entries in the palette
+itself, so it is possible that a particular method of ordering would actually
+result in image data that benefits significantly from filtering (not proven).
+
+Filters are also rarely useful on low-bit-depth (grayscale) images in general.
+
+For grayscale and truecolor images (8 or 16 bits per sample), the standard is
+_minimum sum of absolute differences_.
+
+The filtered bytes are treated as signed values: any value over 127 is treated
+as negative.
+
+```
+128 => -128 255 => -1
+```
+
+The absolute value of each is then summed, and the filter type that produces
+the smallest sum is chosen. This approach effectively gives preference to
+sequences that are close to zero and therefore is biased against filter type
+None.
+
+A different heuristic (still experimental) might be to favor the most recently
+used filter even if its absolute sum of differences is slightly larger than
+that of other filters, in order to produce a more homogeneous data stream for
+the compressor.
+
+**Source**: [libPNG Chapter 9]
 
 
 # Compression
 
+PNG uses DEFLATE, which is a non-patented lossless data compression algorithm,
+involving a combination of [LZ77] and [Huffman coding].
+
+**Sources**: [PNG Wikipedia], [xlib.net] and [libPNG Chapter 9]
+
+[PNG Wikipedia]: https://en.wikipedia.org/wiki/PNG#Compression
+[xlib.net]: https://zlib.net/feldspar.html
+[LZ77]: https://en.wikipedia.org/wiki/LZ77_and_LZ78
+[Huffman coding]: https://en.wikipedia.org/wiki/Huffman_coding
+[libPNG Chapter 9]: http://www.libpng.org/pub/png/book/chapter09.html
