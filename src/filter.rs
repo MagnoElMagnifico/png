@@ -168,7 +168,7 @@ pub fn paeth(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in scanline.iter().enumerate() {
         let left_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        let upleft_byte = if i < bpp { 0 } else { prior_scanline[i - bpp] };
+        let upleft_byte = if i < bpp { 0 } else { *prior_scanline.get(i - bpp).unwrap_or(&0) };
         let top_byte = *prior_scanline.get(i).unwrap_or(&0);
 
         filtered[i] = byte.wrapping_sub(paeth_predictor(left_byte, top_byte, upleft_byte));
@@ -178,6 +178,8 @@ pub fn paeth(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
     filtered
 }
 
+/// Inverse of the `Paeth()` filter
+///
 /// ```
 /// Paeth(x) + PaethPredictor(Raw(x-bpp), Prior(x), Prior(x-bpp))
 /// ```
@@ -187,7 +189,7 @@ pub fn paeth_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
         let left_byte = if i < bpp { 0 } else { original[i - bpp] };
-        let upleft_byte = if i < bpp { 0 } else { prior_scanline[i - bpp] };
+        let upleft_byte = if i < bpp { 0 } else { *prior_scanline.get(i - bpp).unwrap_or(&0) };
         let top_byte = *prior_scanline.get(i).unwrap_or(&0);
 
         original[i] = byte.wrapping_add(paeth_predictor(left_byte, top_byte, upleft_byte));
@@ -197,11 +199,11 @@ pub fn paeth_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
 }
 
 fn paeth_predictor(left: u8, top: u8, upleft: u8) -> u8 {
-    let p = left + top - upleft;
+    let p = left as i16 + top as i16 - upleft as i16;
 
-    let dist_left = u8::abs_diff(p, left);
-    let dist_top = u8::abs_diff(p, top);
-    let dist_upleft = u8::abs_diff(p, upleft);
+    let dist_left = i16::abs_diff(p, left as i16);
+    let dist_top = i16::abs_diff(p, top as i16);
+    let dist_upleft = i16::abs_diff(p, upleft as i16);
 
     if dist_left <= dist_top {
         left
@@ -270,8 +272,24 @@ mod tests {
         assert_eq!(scanline, inverse);
 
         // Now test if the scanline were the first
-        let filtered = up(&scanline, &[]);
-        let inverse = up_inv(&filtered, &[]);
+        let filtered = average(&scanline, &[], bpp);
+        let inverse = average_inv(&filtered, &[], bpp);
+        assert_eq!(scanline, inverse);
+    }
+
+    #[test]
+    fn paeth_test() {
+        let prior_scanline = vec![1, 2, 62, 2, 26, 2, 24, 2];
+        let scanline = vec![12, 42, 23, 52, 9, 1, 1, 9];
+        let bpp = 1;
+
+        let filtered = paeth(&scanline, &prior_scanline, bpp);
+        let inverse = paeth_inv(&filtered, &prior_scanline, bpp);
+        assert_eq!(scanline, inverse);
+
+        // Now test if the scanline were the first
+        let filtered = paeth(&scanline, &[], bpp);
+        let inverse = paeth_inv(&filtered, &[], bpp);
         assert_eq!(scanline, inverse);
     }
 }
