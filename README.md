@@ -9,21 +9,44 @@ Useful image inspector for debugging: [nayuki.io]
 [nayuki.io]: https://www.nayuki.io/page/png-file-chunk-inspector
 [W3 Docs]: https://www.w3.org/TR/png-3/
 
+# Progress
 
-# More files
+- [x] Basic chunk format
+- [ ] Compression
+   - [x] Filtering
+   - [ ] Deflate block format
+   - [ ] Huffman codes
+   - [ ] LZ77
+- [ ] Data structures for main chunks
+   - [x] Header (`IHDR`), End (`IEND`)
+   - [ ] Image data (`IDAT`)
+   - [ ] Palette (`PLTE`)
+   - [ ] Gamma
+   - [ ] (?) Text strings
+- [ ] Alpha
+- [ ] Interlacing Adam7
+- [ ] (?) APNG
 
-- APNG (animated PNG) [APNG Wikipedia] [APNG Mozilla]
-- WAV
+
+# Other file formats to explore
+
+- APNG (animated PNG, [APNG Wikipedia], [APNG Mozilla])
+- WAV ([WAV Wikipedia], [WAV Canon], [WAV FAQ])
 - PDF (?)
 
 [APNG Wikipedia]: https://en.wikipedia.org/wiki/APNG
 [APNG Mozilla]: https://wiki.mozilla.org/APNG_Specification
+
+[WAV Wikipedia]: https://en.wikipedia.org/wiki/WAV
+[WAV Canon]: http://www.lightlink.com/tjweber/StripWav/Canon.html
+[WAV FAQ]:   http://www.lightlink.com/tjweber/StripWav/WAVE.html
 
 [Tsoding PDF]: https://www.twitch.tv/videos/1750784260
 [Tsoding pdf github]: https://github.com/tsoding/rust-pdf-hacking
 
 
 -------------------------------------------------------------------------------
+
 
 # PNG Basics
 
@@ -109,7 +132,7 @@ Standard keywords for text chunks:
 A PNG image is a rectangular pixel array, appearing left-to-right within each
 _scanline_, and these appearing top-to-bottom.
 
-However, the data may be transmitted in a different order, see [Interlaced][PNG Interlaced].
+However, the data may be transmitted in a different order, see [PNG Interlaced].
 
 Pixels are always packed into these scanlines with no wasted bits between
 pixels. Pixels smaller than a byte never cross byte boundaries; they are packed
@@ -240,9 +263,18 @@ the compressor.
 PNG uses DEFLATE, which is a non-patented lossless data compression algorithm,
 involving a combination of [LZ77] and [Huffman coding].
 
-**Sources**: [PNG Wikipedia], [zlib.net] and [libPNG Chapter 9]
+- **Sources**: [PNG Wikipedia], [zlib.net], [thuc.space], [Deflate spec] and [libPNG Chapter 9].
+- **More info**: [Huffman coding] and [LZ77].
 
 > You crazy, don't reinvent the wheel! Use a [library](https://crates.io/crates/flate2)
+
+[PNG Wikipedia]:    https://en.wikipedia.org/wiki/PNG#Compression
+[Huffman coding]:   https://en.wikipedia.org/wiki/Huffman_coding
+[LZ77]:             https://en.wikipedia.org/wiki/LZ77_and_LZ78
+[zlib.net]:         https://zlib.net/feldspar.html
+[Deflate spec]:     https://www.rfc-editor.org/rfc/rfc1951
+[libPNG Chapter 9]: http://www.libpng.org/pub/png/book/chapter09.html
+[thuc.space]:       https://thuc.space/posts/deflate/
 
 
 ## `LZ77`
@@ -334,9 +366,9 @@ bits from the root to the leaves.
 
 Note that, to decode the original document, we also have to store this tree / table.
 
-<!-- TODO: Additional Deflate rules -->
-
 <!--
+TODO: Additional Deflate rules
+
 However, there is also the question: how do you pass the tree along with the
 encoded data? It turns out that there is a fairly simple way, if you modify
 slightly the algorithm used to generate the tree.
@@ -354,11 +386,18 @@ comes before E.)
 It turns out that when these two restrictions are placed upon the trees, there
 is at most one possible tree for every set of elements and their respective
 codelengths. The codelengths are all that we need to reconstruct the tree, and
-therefore all that we need to transmit. 
+therefore all that we need to transmit.
 -->
+
+[thuc.space Huffman]: https://thuc.space/posts/huffman_coding_algorithm/
+[Abdul Bari video]: https://youtu.be/co4_ahEDCho?t=525
 
 
 ## Deflate
+
+A compressed data set consists of a series of blocks of arbitrary size (except
+non-compressible blocks, which are limited to 65 535 bytes) using a combination
+of LZ77 and Huffman codes.
 
 There are three modes of compression that the compressor has available:
 
@@ -372,24 +411,10 @@ There are three modes of compression that the compressor has available:
    itself, and so no extra space needs to be taken to store those trees.
 
 3. Compression, first with LZ77 and then with Huffman coding with trees that
-   the compressor creates and stores along with the data. 
+   the compressor creates and stores along with the data.
 
-
-<!-- Wikipedia links -->
-[PNG Wikipedia]:  https://en.wikipedia.org/wiki/PNG#Compression
-[Huffman coding]: https://en.wikipedia.org/wiki/Huffman_coding
-[LZ77]:           https://en.wikipedia.org/wiki/LZ77_and_LZ78
-<!-- Deflate specs -->
-[zlib.net]:         https://zlib.net/feldspar.html
-[Deflate spec]:     https://www.rfc-editor.org/rfc/rfc1951
-[libPNG Chapter 9]: http://www.libpng.org/pub/png/book/chapter09.html
-<!-- Good notes about Deflate -->
-[thuc.space]: https://thuc.space/posts/deflate/
-[thuc.space Huffman]: https://thuc.space/posts/huffman_coding_algorithm/
-[Abdul Bari video]: https://youtu.be/co4_ahEDCho?t=525
+<!-- TODO -->
 [codersnotes.com]: http://www.codersnotes.com/notes/elegance-of-deflate/
-<!-- Example code -->
 [code]: https://github.com/Frommi/miniz_oxide
-<!-- Deflate debugger tool -->
 [debugger]: https://github.com/madler/infgen/
 

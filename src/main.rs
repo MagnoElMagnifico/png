@@ -3,6 +3,36 @@ mod crc;
 mod filter;
 mod png;
 
+#[allow(unused_imports)]
+use crate::chunks::{GenericChunk, IDAT, ImageHeader, ImageTrailer};
+use crate::png::Png;
+use std::{path::Path, fs::File, io::Write};
+
+#[allow(dead_code)]
+const SIZE: usize = 500;
+
+// Create a simple PNG image
+fn main() {
+    let png = Png::read(Path::new("assets/pnglogo.png")).unwrap();
+
+    for (i, idat) in png.chunks.iter().filter(|x| x.get_type() == IDAT).enumerate() {
+        println!("{:?}", idat);
+        File::create(format!("idat{i}.dat")).unwrap().write_all(&idat.data_to_bytes()).unwrap();
+    }
+
+    // let mut png = Png::empty();
+    //
+    // let image_data = [0xAA; 3*SIZE*SIZE + SIZE];
+    //
+    // // Greyscale, 1 byte per sample (8 bits), no interlacing
+    // png.chunks.push(Box::new(ImageHeader::new((SIZE as u32, SIZE as u32), 8, 2, false)));
+    // png.chunks.push(Box::new(GenericChunk::from_bytes(IDAT, &image_data)));
+    // png.chunks.push(Box::new(ImageTrailer));
+    //
+    // png.write(Path::new("test_output.png")).unwrap();
+}
+
+/*
 use crate::png::Png;
 use std::{env, path::Path, process::exit};
 
@@ -27,6 +57,7 @@ fn main() {
 
     println!("{:#?}", png.chunks);
 }
+*/
 
 // These tests have to be checked manually opening the PNG output for the moment.
 /* #[cfg(test)]
