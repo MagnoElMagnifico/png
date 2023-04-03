@@ -1,5 +1,10 @@
-use crate::{chunks, chunks::Chunk, crc::Crc};
+use chunks::Chunk;
+use crc::Crc;
 use std::{fs, io, mem::size_of, path::Path};
+
+pub mod chunks;
+pub mod crc;
+pub mod filter;
 
 // Signature
 pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];

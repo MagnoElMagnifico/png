@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Each chunk has the following structure:
 //!
 //! - length of the data section: u32
@@ -8,9 +7,8 @@
 //!
 //! Note that the bytes (u32) are stored in Big-Endian
 
+use super::crc::Crc;
 use std::mem::size_of;
-
-use crate::crc::Crc;
 
 /// The ChunkCode consists in four bytes whose values are between 65-90 and 97-122 decimal, so
 /// uppercase and lowercase ASCII letters. However they should be always treated as integers and not
@@ -68,6 +66,7 @@ impl ChunkType {
     }
 
     pub fn is_safe_to_copy(&self) -> bool {
+        // TODO: clippy: incompatible bit mask: `_ & 32` can never be equal to `1`
         self.0[3] & (1 << 5) == 1
     }
 }
@@ -186,7 +185,7 @@ impl ImageHeader {
             color_type,
             compression: 0,
             filter: 0,
-            interlace: if adam7_interlace { 1 } else { 0 },
+            interlace: u8::from(adam7_interlace),
         }
     }
 

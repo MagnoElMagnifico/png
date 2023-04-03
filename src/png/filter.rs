@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Algorithms that prepare the image data for optimum compression, because it can significantly
 //! reduce the resultant size.
 //!
@@ -168,7 +167,11 @@ pub fn paeth(scanline: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in scanline.iter().enumerate() {
         let left_byte = if i < bpp { 0 } else { scanline[i - bpp] };
-        let upleft_byte = if i < bpp { 0 } else { *prior_scanline.get(i - bpp).unwrap_or(&0) };
+        let upleft_byte = if i < bpp {
+            0
+        } else {
+            *prior_scanline.get(i - bpp).unwrap_or(&0)
+        };
         let top_byte = *prior_scanline.get(i).unwrap_or(&0);
 
         filtered[i] = byte.wrapping_sub(paeth_predictor(left_byte, top_byte, upleft_byte));
@@ -189,7 +192,11 @@ pub fn paeth_inv(filtered: &[u8], prior_scanline: &[u8], bpp: u8) -> Vec<u8> {
 
     for (i, byte) in filtered.iter().skip(1).enumerate() {
         let left_byte = if i < bpp { 0 } else { original[i - bpp] };
-        let upleft_byte = if i < bpp { 0 } else { *prior_scanline.get(i - bpp).unwrap_or(&0) };
+        let upleft_byte = if i < bpp {
+            0
+        } else {
+            *prior_scanline.get(i - bpp).unwrap_or(&0)
+        };
         let top_byte = *prior_scanline.get(i).unwrap_or(&0);
 
         original[i] = byte.wrapping_add(paeth_predictor(left_byte, top_byte, upleft_byte));
