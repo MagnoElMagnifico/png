@@ -1,10 +1,8 @@
 > Note: In the code there are comments that summarize the [official
 > specification] and the [W3 Docs].
 
-> Also, here is an useful image inspector for debugging: [nayuki.io]
 
 [official specification]: http://libpng.org/pub/png/spec/1.2/PNG-Contents.html
-[nayuki.io]: https://www.nayuki.io/page/png-file-chunk-inspector
 [W3 Docs]: https://www.w3.org/TR/png-3/
 
 

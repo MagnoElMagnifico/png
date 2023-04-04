@@ -28,8 +28,10 @@ PNG
 
 WAV
 
-- [ ] Basic chunk format
-- [ ] TODO
+- [x] Basic chunk format
+- [x] Create WAV file with samples
+- [ ] Generate basic waveforms using an iterator
+- [ ] Add several waveforms
 
 
 # Other file formats to explore
@@ -48,3 +50,11 @@ WAV
 [Tsoding PDF]: https://www.twitch.tv/videos/1750784260
 [Tsoding pdf github]: https://github.com/tsoding/rust-pdf-hacking
 
+
+# Useful links
+
+- PNG inspector: [nayuki.io]
+- Audacity online: [wavacity]
+
+[nayuki.io]: https://www.nayuki.io/page/png-file-chunk-inspector
+[wavacity]: https://wavacity.com/
