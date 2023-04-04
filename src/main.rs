@@ -1,8 +1,7 @@
-use png::Wav;
+use png::{wav::WavSamples, Wav};
 use png::{Png, IDAT};
 use std::{env::args, path::Path};
 
-// Create a simple PNG image
 fn main() {
     let file_type = args().nth(1).unwrap();
     let file_name = args().nth(2).unwrap();
@@ -20,6 +19,23 @@ fn main() {
             println!("{:?}", wav.data);
         }
 
+        "write-wav" => {
+            Wav::from_data(create_wav(44100), 44100).write(Path::new(&file_name)).expect("error writing WAV file");
+        }
+
         _ => println!("Unknown option: {}", file_type),
     }
+}
+
+fn create_wav(sample_rate: u32) -> WavSamples {
+    let seconds = 3;
+    let volume = 128;
+
+    let mut data = vec![0_u8; seconds * sample_rate as usize];
+
+    for (i, sample) in data.iter_mut().enumerate() {
+        *sample = volume * ( i % 100 == 0 ) as u8;
+    }
+
+    WavSamples::Mono8(data)
 }
