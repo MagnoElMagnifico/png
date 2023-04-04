@@ -1,14 +1,36 @@
 use std::{fs, io, io::Write, iter::zip, path::Path};
 
+/// Text `RIFF` encoded in ASCII
 const RIFF: [u8; 4] = [82, 73, 70, 70];
+/// Text `WAVE` enconded in ASCII
 const WAVE: [u8; 4] = [87, 65, 86, 69];
+/// Text `fmt ` encoded in ASCII
 const FMT: [u8; 4] = [102, 109, 116, 32];
+/// Text `data` encoded in ASCII
 const DATA: [u8; 4] = [100, 97, 116, 97];
 
-//  8-bit samples are stored as unsigned bytes, ranging from 0 to 255. 16-bit samples are
-//  stored as 2's-complement signed integers, ranging from -32768 to 32767
-//
-//  For stereo audio, channel 0 is the left channel (.0) and channel 1 is the right (.1).
+/// Data Structure representing WAV samples.
+///
+/// Bits per sample:
+///
+/// - 8-bit samples: stored as unsigned bytes, ranging from 0 to 255.
+/// - 16-bit samples: stores as 2's-complement signed integers, ranging from -32768 to 32767.
+///
+/// Channels:
+///
+/// - Stereo: 2 channels
+/// - Mono: 1 channel
+///
+/// Fo multi-channel data, samples are interleaved between channels:
+///
+/// ```
+/// sample 0 for channel 0
+/// sample 0 for channel 1
+/// sample 1 for channel 0
+/// sample 1 for channel 1
+/// ```
+///
+/// Where, for stereo audio, channel 0 is left and 1 is right.
 #[derive(Debug, Clone)]
 pub enum WavSamples {
     Stereo16(Vec<(i16, i16)>),
@@ -19,6 +41,7 @@ pub enum WavSamples {
 
 #[rustfmt::skip]
 impl WavSamples {
+    /// Converts a buffer into its corresponding WavSamples.
     pub fn from_bytes(data: &[u8], stereo: bool, bits_per_sample: u16) -> Self {
         assert!(
             bits_per_sample == 8 || bits_per_sample == 16,
@@ -77,7 +100,48 @@ impl Into<Vec<u8>> for WavSamples {
     }
 }
 
-#[allow(dead_code)]
+/// Data Structure representing a WAV file.
+///
+/// # WAV file format
+///
+/// The canonical WAVE format starts with the RIFF header:
+///
+/// ```
+///  Offset  Length   Contents
+///  0       4 bytes  'RIFF' = 0x52494646
+///  4       4 bytes  <file length - 8>
+///  8       4 bytes  'WAVE' = 0x57415645
+/// ```
+///
+/// The `8` on the second entry is the length of the first two, thus the second entry is the number
+/// of bytes that follow in the file.
+///
+/// Next a `fmt` chunk that describes the sample format:
+///
+/// ```
+///  Offset  Length   Contents
+///  12      4 bytes  'fmt ' = 0x666d7420
+///  16      4 bytes  0x00000010            // Length of the fmt data (16 bytes)
+///  20      2 bytes  0x0001                // Format tag: 1 = PCM
+///  22      2 bytes  <channels>            // Channels: 1 = mono, 2 = stereo
+///  24      4 bytes  <sample rate>         // Samples per second: e.g., 44100
+///  28      4 bytes  <bytes/second>        // sample rate * block align
+///  32      2 bytes  <block align>         // channels * bits/sample / 8
+///  34      2 bytes  <bits/sample>         // 8 or 16
+///  ```
+///
+///  Finally, the `data` chunk conteining the sample data:
+///
+/// Finally, the data chunk contains the sample data:
+///
+/// ```
+///  Offset  Length   Contents
+///  36      4 bytes  'data' = 0x64617461
+///  40      4 bytes  <length of the data block> = <file length - 36>
+///  44      -        <sample data>
+/// ```
+///
+/// (Source)[http://www.lightlink.com/tjweber/StripWav/Canon.html]
 #[derive(Debug, Clone)]
 pub struct Wav {
     pub data: WavSamples,
@@ -85,10 +149,12 @@ pub struct Wav {
 }
 
 impl Wav {
+    /// Creates a new Wav given the samples and the sample rate.
     pub fn from_data(data: WavSamples, sample_rate: u32) -> Self {
         Self { data, sample_rate }
     }
 
+    /// Reads the file given and converts its contents into WavSamples.
     #[rustfmt::skip]
     pub fn read(input_file: &Path) -> io::Result<Self> {
         let file_data = fs::read(input_file)?;
@@ -123,8 +189,19 @@ impl Wav {
             data: WavSamples::from_bytes(&file_data[44..], channels == 2, bits_per_sample),
             sample_rate,
         })
+
+        // The entire function can be simplified to:
+        // Ok(Self {
+        //      data: WavSamples::from_bytes(
+        //          &file_data[44..],
+        //          u16::from_le_bytes(file_data[22..24].try_into().expect("read channels") == 2
+        //          u16::from_le_bytes(file_data[34..36].try_into().expect("read bits/sample")
+        //      ),
+        //      sample_rate: u32::from_le_bytes(file_data[24..28].try_into().expect("read sample rate")),
+        // })
     }
 
+    /// Writes to the filepath given the WAV file.
     pub fn write(self, output_file: &Path) -> io::Result<()> {
         let (channels, bits_per_sample) = match self.data {
             WavSamples::Stereo16(_) => (2_u16, 16_u16),
