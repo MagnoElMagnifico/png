@@ -19,23 +19,50 @@ fn main() {
             println!("{:?}", wav.data);
         }
 
-        "write-wav" => {
-            Wav::from_data(create_wav(44100), 44100).write(Path::new(&file_name)).expect("error writing WAV file");
-        }
-
+        "sin-wav" => create_sinwav(&file_name),
+        "sqr-wav" => create_sqrwav(&file_name),
         _ => println!("Unknown option: {}", file_type),
     }
 }
 
-fn create_wav(sample_rate: u32) -> WavSamples {
-    let seconds = 3;
-    let volume = 128;
+use std::f32::consts::PI;
+
+fn create_sinwav(file_name: &str) {
+    let sample_rate = 44100;
+    let seconds = 5;
+    let frecuency = 100.0;
+
+    let volume = 64.0;
+    let volume_offset = 128.0;
 
     let mut data = vec![0_u8; seconds * sample_rate as usize];
 
     for (i, sample) in data.iter_mut().enumerate() {
-        *sample = volume * ( i % 100 == 0 ) as u8;
+        let t = i as f32 / sample_rate as f32;
+        *sample = (volume * f32::sin(2.0 * PI * frecuency * t) + volume_offset) as u8;
     }
 
-    WavSamples::Mono8(data)
+    Wav::from_data(WavSamples::Mono8(data), sample_rate)
+        .write(Path::new(&file_name))
+        .expect("error writing WAV file");
+}
+
+fn create_sqrwav(file_name: &str) {
+    let sample_rate = 44100;
+    let seconds = 5;
+
+    let volume = 32000;
+    let period = 1.0 / 100.0;
+    let samples_per_period = sample_rate as f32 * period;
+    let high_samples = 0.5 * samples_per_period;
+
+    let mut data = vec![0_i16; seconds * sample_rate as usize];
+
+    for (i, sample) in data.iter_mut().enumerate() {
+        *sample = volume * (i as f32 % samples_per_period < high_samples) as i16;
+    }
+
+    Wav::from_data(WavSamples::Mono16(data), sample_rate)
+        .write(Path::new(&file_name))
+        .expect("error writing WAV file");
 }
