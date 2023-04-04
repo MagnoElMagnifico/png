@@ -86,10 +86,7 @@ pub struct Wav {
 
 impl Wav {
     pub fn from_data(data: WavSamples, sample_rate: u32) -> Self {
-        Self {
-            data,
-            sample_rate
-        }
+        Self { data, sample_rate }
     }
 
     #[rustfmt::skip]
@@ -148,7 +145,7 @@ impl Wav {
 
         file.write(&FMT)?;
         file.write(&16_u32.to_le_bytes())?; // length of fmt header
-        file.write(&1_u16.to_le_bytes())?;  // PCM format tag
+        file.write(&1_u16.to_le_bytes())?; // PCM format tag
 
         file.write(&channels.to_le_bytes())?;
         file.write(&self.sample_rate.to_le_bytes())?;
