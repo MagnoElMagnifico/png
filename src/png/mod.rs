@@ -1,6 +1,6 @@
 use chunks::Chunk;
 use crc::Crc;
-use std::{fs, io, mem::size_of, path::Path};
+use std::{fs, io, io::Write, path::Path};
 
 pub mod chunks;
 pub mod crc;
@@ -80,20 +80,13 @@ impl Png {
     }
 
     pub fn write(&self, output_file: &Path) -> io::Result<()> {
-        let mut bytes = Vec::with_capacity(
-            size_of::<[u8; 8]>()
-                + self
-                    .chunks
-                    .iter()
-                    .map(|c| c.data_size() as usize + 4)
-                    .sum::<usize>(),
-        );
-        bytes.extend_from_slice(&SIGN);
+        let mut file = fs::File::create(output_file)?;
 
+        file.write(&SIGN)?;
         for chunk in &self.chunks {
-            bytes.extend_from_slice(&chunk.to_bytes(&self.crc));
+            file.write(&chunk.to_bytes(&self.crc))?;
         }
 
-        fs::write(output_file, bytes)
+        Ok(())
     }
 }
