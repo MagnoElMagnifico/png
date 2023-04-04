@@ -14,6 +14,7 @@ pub const SIGN: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 ///
 /// The official spec: http://libpng.org/pub/png/spec/1.2/PNG-Structure.html
 pub struct Png {
+    // TODO?: Store directly IHDR since every PNG must have one
     pub chunks: Vec<Box<dyn Chunk>>,
     crc: Crc,
 }
