@@ -126,23 +126,26 @@ impl Wav {
     }
 
     pub fn write(self, output_file: &Path) -> io::Result<()> {
-        let mut file = fs::File::create(output_file)?;
-
-        // RIFF header
-        file.write(&RIFF)?;
-        file.write(&WAVE)?;
-
-        // fmt chunk
         let (channels, bits_per_sample) = match self.data {
             WavSamples::Stereo16(_) => (2_u16, 16_u16),
             WavSamples::Stereo8(_) => (2_u16, 8_u16),
             WavSamples::Mono16(_) => (1_u16, 16_u16),
             WavSamples::Mono8(_) => (1_u16, 8_u16),
         };
-
         let block_align: u16 = channels * bits_per_sample / 8;
         let bytes_per_second: u32 = self.sample_rate * block_align as u32;
 
+        let samples_data: Vec<u8> = self.data.into();
+        let file_length: u32 = samples_data.len() as u32 + 36;
+
+        let mut file = fs::File::create(output_file)?;
+
+        // RIFF header
+        file.write(&RIFF)?;
+        file.write(&file_length.to_le_bytes())?;
+        file.write(&WAVE)?;
+
+        // fmt chunk
         file.write(&FMT)?;
         file.write(&16_u32.to_le_bytes())?; // length of fmt header
         file.write(&1_u16.to_le_bytes())?; // PCM format tag
@@ -154,8 +157,6 @@ impl Wav {
         file.write(&bits_per_sample.to_le_bytes())?;
 
         // data chunk
-        let samples_data: Vec<u8> = self.data.into();
-
         file.write(&DATA)?;
         file.write(&(samples_data.len() as u32).to_le_bytes())?;
         file.write(&samples_data)?;
