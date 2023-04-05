@@ -5,4 +5,4 @@ pub use png::chunks::{Chunk, ImageHeader, ImageTrailer, IDAT, IEND, IHDR};
 pub use png::Png;
 
 pub use wav::{Wav, WavSamples};
-pub use wav::synth::Oscilator;
+pub use wav::synth::{Oscilator, WaveForm};

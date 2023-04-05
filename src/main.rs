@@ -1,4 +1,4 @@
-use png::{wav::WavSamples, Wav};
+use png::{Oscilator, Wav, WaveForm};
 use png::{Png, IDAT};
 use std::{env::args, path::Path};
 
@@ -19,10 +19,18 @@ fn main() {
             println!("{:?}", wav.data);
         }
 
-        "sin-wav" => create_sinwav(&file_name),
-        "sqr-wav" => create_sqrwav(&file_name),
-        "saw-wav" => create_sawwav(&file_name),
+        "sin-wav" => Oscilator::new(44100, 220.0, WaveForm::Sin, 64, 128)
+            .to_wav(5000)
+            .write(Path::new(&file_name))
+            .unwrap(),
+        "saw-wav" => Oscilator::new(44100, 220.0, WaveForm::Saw, 64, 128)
+            .to_wav(5000)
+            .write(Path::new(&file_name))
+            .unwrap(),
+        "sqr-wav" => Oscilator::new(44100, 220.0, WaveForm::Sqr(0.5), 64, 128)
+            .to_wav(5000)
+            .write(Path::new(&file_name))
+            .unwrap(),
         _ => println!("Unknown option: {}", file_type),
     }
 }
-
