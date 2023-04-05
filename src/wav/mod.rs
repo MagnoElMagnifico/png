@@ -1,3 +1,5 @@
+pub mod synth;
+
 use std::{fs, io, io::Write, iter::zip, path::Path};
 
 /// Text `RIFF` encoded in ASCII
