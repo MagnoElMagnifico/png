@@ -5,20 +5,18 @@ pub enum WaveForm {
     Sin,
     Sqr(f32),
     Saw,
+    Custom(fn(usize, &Oscilator) -> u8),
 }
 
 pub struct Oscilator {
     wave: WaveForm,
-    sample_rate: u32,
-    spp: f32,
-    frecuency: f32,
-    volume: u8,
-    offset: u8,
+    pub sample_rate: u32,
+    pub spp: f32,
+    pub frecuency: f32,
+    pub volume: u8,
+    pub offset: u8,
 }
 
-// get_samples
-// volume
-// volume_offset
 // sin_wave, square_wave, sawtooth_wave, triangular_wave, custom
 // add
 impl Oscilator {
@@ -40,9 +38,9 @@ impl Oscilator {
             WaveForm::Sin => self.sin_wave(&mut data),
             WaveForm::Sqr(pulse_width) => self.sqr_wave(&mut data, pulse_width),
             WaveForm::Saw => self.saw_wave(&mut data),
+            WaveForm::Custom(callback) => self.custom_wave(&mut data, callback),
         }
 
-        self.sin_wave(&mut data);
         WavSamples::Mono8(data)
     }
 
@@ -76,6 +74,12 @@ impl Oscilator {
             // x is the porcentage of the wave at the current point
             let x = (i % self.spp as usize) as f32 / self.spp as f32;
             *sample = self.offset + self.volume * x as u8;
+        }
+    }
+
+    fn custom_wave(&self, data: &mut [u8], callback: fn(usize, &Oscilator) -> u8) {
+        for (i, sample) in data.iter_mut().enumerate() {
+            *sample = callback(i, self);
         }
     }
 }

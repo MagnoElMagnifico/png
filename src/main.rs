@@ -31,6 +31,16 @@ fn main() {
             .to_wav(5000)
             .write(Path::new(&file_name))
             .unwrap(),
+        "custom-wav" => Oscilator::new(
+            44100,
+            220.0,
+            WaveForm::Custom(|x, o| (x % o.frecuency as usize) as u8),
+            0,
+            0,
+        )
+        .to_wav(5000)
+        .write(Path::new(&file_type))
+        .unwrap(),
         _ => println!("Unknown option: {}", file_type),
     }
 }
