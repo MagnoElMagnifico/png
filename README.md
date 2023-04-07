@@ -30,8 +30,9 @@ WAV
 
 - [x] Basic chunk format
 - [x] Create WAV file with samples
-- [ ] Generate basic waveforms using an iterator
+- [x] Generate basic waveforms using an iterator
 - [ ] Add several waveforms
+- [ ] Modify existing wave files with oscillators and manually
 
 
 # Other file formats to explore
