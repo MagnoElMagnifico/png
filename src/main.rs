@@ -1,4 +1,4 @@
-use png::{Oscilator, Wav, WaveForm};
+use png::{Oscillator, Wav, WaveForm};
 use png::{Png, IDAT};
 use std::{env::args, path::Path};
 
@@ -19,19 +19,19 @@ fn main() {
             println!("{:?}", wav.data);
         }
 
-        "sin-wav" => Oscilator::new(44100, 220.0, WaveForm::Sin, 64, 128)
+        "sin-wav" => Oscillator::new(44100, 220.0, WaveForm::Sin, 64, 128)
             .to_wav(5000)
             .write(Path::new(&file_name))
             .unwrap(),
-        "saw-wav" => Oscilator::new(44100, 220.0, WaveForm::Saw, 64, 128)
+        "saw-wav" => Oscillator::new(44100, 220.0, WaveForm::Saw, 64, 128)
             .to_wav(5000)
             .write(Path::new(&file_name))
             .unwrap(),
-        "sqr-wav" => Oscilator::new(44100, 220.0, WaveForm::Sqr(0.5), 64, 128)
+        "sqr-wav" => Oscillator::new(44100, 220.0, WaveForm::Sqr(0.5), 64, 128)
             .to_wav(5000)
             .write(Path::new(&file_name))
             .unwrap(),
-        "custom-wav" => Oscilator::new(
+        "custom-wav" => Oscillator::new(
             44100,
             220.0,
             WaveForm::Custom(|x, o| (x % o.frecuency as usize) as u8),

@@ -5,10 +5,10 @@ pub enum WaveForm {
     Sin,
     Sqr(f32),
     Saw,
-    Custom(fn(usize, &Oscilator) -> u8),
+    Custom(fn(usize, &Oscillator) -> u8),
 }
 
-pub struct Oscilator {
+pub struct Oscillator {
     wave: WaveForm,
     pub sample_rate: u32,
     pub spp: f32,
@@ -17,9 +17,7 @@ pub struct Oscilator {
     pub offset: u8,
 }
 
-// sin_wave, square_wave, sawtooth_wave, triangular_wave, custom
-// add
-impl Oscilator {
+impl Oscillator {
     pub fn new(sample_rate: u32, frecuency: f32, wave: WaveForm, volume: u8, offset: u8) -> Self {
         Self {
             sample_rate,
@@ -77,7 +75,7 @@ impl Oscilator {
         }
     }
 
-    fn custom_wave(&self, data: &mut [u8], callback: fn(usize, &Oscilator) -> u8) {
+    fn custom_wave(&self, data: &mut [u8], callback: fn(usize, &Oscillator) -> u8) {
         for (i, sample) in data.iter_mut().enumerate() {
             *sample = callback(i, self);
         }
