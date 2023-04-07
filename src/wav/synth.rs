@@ -12,7 +12,7 @@ pub trait Oscillator {
     fn weighted_sum(self, other: Self) -> Self;
 }
 
-pub enum WaveForm {
+pub enum BasicWaveForm {
     Sin,
     Sqr(f32),
     Saw,
@@ -20,7 +20,7 @@ pub enum WaveForm {
 }
 
 pub struct BasicOscillator {
-    wave: WaveForm,
+    wave: BasicWaveForm,
     sample_rate: u32,
     pub frecuency: f32,
     pub volume: u8,
@@ -28,7 +28,7 @@ pub struct BasicOscillator {
 }
 
 impl BasicOscillator {
-    pub fn new(sample_rate: u32, frecuency: f32, wave: WaveForm, volume: u8, offset: u8) -> Self {
+    pub fn new(sample_rate: u32, frecuency: f32, wave: BasicWaveForm, volume: u8, offset: u8) -> Self {
         Self {
             sample_rate,
             frecuency,
@@ -83,10 +83,10 @@ impl Oscillator for BasicOscillator {
         let mut data = vec![0; (time * self.sample_rate / 1000) as usize];
 
         match self.wave {
-            WaveForm::Sin => self.sin_wave(&mut data),
-            WaveForm::Sqr(pulse_width) => self.sqr_wave(&mut data, pulse_width),
-            WaveForm::Saw => self.saw_wave(&mut data),
-            WaveForm::Custom(callback) => self.custom_wave(&mut data, callback),
+            BasicWaveForm::Sin => self.sin_wave(&mut data),
+            BasicWaveForm::Sqr(pulse_width) => self.sqr_wave(&mut data, pulse_width),
+            BasicWaveForm::Saw => self.saw_wave(&mut data),
+            BasicWaveForm::Custom(callback) => self.custom_wave(&mut data, callback),
         }
 
         WavSamples::Mono8(data)
