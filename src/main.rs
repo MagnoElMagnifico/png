@@ -1,4 +1,4 @@
-use png::{Oscillator, SinOsc, SawOsc, SqrOsc, Wav};
+use png::{Oscillator, SawOsc, SinOsc, SqrOsc, Wav};
 use png::{Png, IDAT};
 use std::{env::args, path::Path};
 
