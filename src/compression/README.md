@@ -413,6 +413,16 @@ of `LEN`.
 
 ### Compression with fixed Huffman codes (`BTYPE=01`)
 
+```
++------------+-------------+
+| BFINAL     | BTYPE = 01  |  Header
++------------+-------------+ ---------
+|                          |  Data
+|      Compressed data     |
+|                          |
++--------------------------+
+```
+
 The Huffman codes for the two alphabets are fixed and not represented
 explicitly in the data.
 
@@ -437,7 +447,37 @@ will never be used, but participate in the code construction.
 
 ## Compression with dynamic Huffman codes (`BTYPE=10`)
 
-<!-- TODO -->
+```
++------------+-------------+
+| BFINAL     | BTYPE = 01  |  Header
++------------+-------------+ ---------
+|    Huffman code trees    |  Data
+| literal/length, distance |
++--------------------------+
+|                          |
+|      Compressed data     |
+|                          |
++--------------------------+
+```
+
+The Huffman codes appear immediately after the header block, first the
+literals/lengths and then the distances.
+
+For even greater compactness, the code length sequences are algo encoded using
+a Huffman code:
+
+```
+0 - 15   Represent code lengths of 0 - 15
+    16   Copy the previous code length 3 - 6 times.
+         The next 2 bits indicate repeat length (0 = 3, ... , 3 = 6)
+             Example:  Codes 8, 16 (+2 bits 11),
+                       16 (+2 bits 10) will expand to
+                       12 code lengths of 8 (1 + 6 + 5)
+    17   Repeat a code length of 0 for 3 - 10 times.
+       (3 bits of length)
+    18   Repeat a code length of 0 for 11 - 138 times
+       (7 bits of length)
+```
 
 # Decoding algorithm
 
@@ -447,12 +487,12 @@ do
 
    if stored with no compression
       skip any remaining bits in current partially processed byte
-      read LEN and NLEN                                             (see next section)
+      read LEN and NLEN
       copy LEN bytes of data to output
 
    else
       if compressed with dynamic Huffman codes
-         read representation of code trees                          (see subsection below)
+         read representation of code trees
 
       loop (until end_of_block code recognized)
          decode literal/length value from input stream
